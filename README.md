@@ -41,6 +41,23 @@ Technologies:
 
 ---
 
+# Authors
+
+**Progressify** was created by third-year students of  
+**Applied Computer Science and Measurement Systems**  
+at the **Faculty of Physics and Astronomy, University of Wrocław**.
+
+The application was developed as part of the course **Mobile Application Project**.
+
+## Development Team
+
+| Role | Developer |
+|-----|-----|
+| Frontend Developer | <img src="https://github.com/Manorekk.png" width="40"/> <br> **Bartosz Lubański** <br> [GitHub](https://github.com/Manorekk) |
+| Backend Developer | <img src="https://github.com/AdrianOrynski.png" width="40"/> <br> **Adrian Oryński** <br> [GitHub](https://github.com/AdrianOrynski) |
+
+---
+
 # Technology Stack
 
 | Component | Technology |

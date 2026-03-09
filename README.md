@@ -51,10 +51,10 @@ The application was developed as part of the course **Mobile Application Project
 
 ## Development Team
 
-| Role | Developer |
-|-----|-----|
-| Frontend Developer | <img src="https://github.com/Manorekk.png" width="40"/> <br> **Bartosz Lubański** <br> [GitHub](https://github.com/Manorekk) |
-| Backend Developer | <img src="https://github.com/AdrianOrynski.png" width="40"/> <br> **Adrian Oryński** <br> [GitHub](https://github.com/AdrianOrynski) |
+| Role | Avatar | Name | GitHub |
+|------|-------|------|--------|
+| Frontend Developer | <img src="https://github.com/Manorekk.png" width="40"/> | **Bartosz Lubański** | [GitHub](https://github.com/Manorekk) |
+| Backend Developer | <img src="https://github.com/AdrianOrynski.png" width="40"/> | **Adrian Oryński** | [GitHub](https://github.com/AdrianOrynski) |
 
 ---
 

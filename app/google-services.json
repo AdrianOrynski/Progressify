@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "763062457930",
+    "project_id": "progressify-94d56",
+    "storage_bucket": "progressify-94d56.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:763062457930:android:7eb338813eb798ab92f8b3",
+        "android_client_info": {
+          "package_name": "com.example.progressify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0WXdN4upKVI1ivpV6l4zBLowTbEZZzXw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

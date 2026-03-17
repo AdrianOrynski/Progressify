@@ -1,0 +1,13 @@
+package com.example.progressify
+
+import com.google.firebase.Timestamp
+
+data class User(
+    val uid: String = "",
+    val name: String = "",
+    val surname: String = "",
+    val nickname: String = "",
+    val createdAt: Timestamp? = null,
+    val experiencePoints: Int = 0,
+    val level: Int = 1
+)

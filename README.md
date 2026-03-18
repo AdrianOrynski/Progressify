@@ -102,13 +102,11 @@ Screens:
 - Implement authentication logic
 - Support:
   - Email login
-  - Anonymous login
 - Store user profiles in Firestore
 
 ### Frontend
 - Login screen
 - Registration screen
-- Anonymous login option
 - Navigation after login
 
 ---

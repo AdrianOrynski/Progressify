@@ -1,7 +1,9 @@
 package com.example.progressify
 
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.Exclude
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.PropertyName
 
 // ── Difficulty level ─────────────────────────────────────────────
 enum class Difficulty(val label: String, val xpBase: Int) {
@@ -47,22 +49,29 @@ data class Task(
     val difficulty  : String         = Difficulty.MEDIUM.name,
     val startTime   : Timestamp?     = null,
     val endTime     : Timestamp?     = null,
+
+    @get:PropertyName("isCompleted")
+    @PropertyName("isCompleted")
     val isCompleted : Boolean        = false,
+
     val completedAt : Timestamp?     = null,
     val xpAwarded   : Int            = 0,
     val recurrence  : RecurrenceRule = RecurrenceRule()
 ) {
+    @get:Exclude
     val isOverdue: Boolean
         get() = endTime != null &&
                 !isCompleted &&
                 endTime.toDate().before(java.util.Date())
 
+    @get:Exclude
     val completedOnTime: Boolean
         get() = isCompleted &&
                 endTime != null &&
                 completedAt != null &&
                 completedAt.toDate().before(endTime.toDate())
 
+    @get:Exclude
     val isRecurring: Boolean
         get() = recurrence.type != RecurrenceType.NONE.name
 
@@ -81,9 +90,11 @@ data class Task(
 class TaskRepository {
     private val db = FirebaseFirestore.getInstance()
 
+    private fun getUserTasksCollection(uid: String) =
+        db.collection("users").document(uid).collection("tasks")
+
     fun getTasks(uid: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
-        db.collection("tasks")
-            .whereEqualTo("uid", uid)
+        getUserTasksCollection(uid)
             .get()
             .addOnSuccessListener { documents ->
                 val tasks = documents.mapNotNull { it.toObject(Task::class.java) }
@@ -93,21 +104,27 @@ class TaskRepository {
     }
 
     fun addTask(task: Task, onComplete: (Boolean) -> Unit) {
-        val id        = db.collection("tasks").document().id
-        val taskWithId = task.copy(id = id)
-        db.collection("tasks").document(id).set(taskWithId)
+        if (task.uid.isEmpty()) {
+            onComplete(false)
+            return
+        }
+
+        val taskRef = getUserTasksCollection(task.uid).document()
+        val taskWithId = task.copy(id = taskRef.id)
+
+        taskRef.set(taskWithId)
             .addOnCompleteListener { onComplete(it.isSuccessful) }
     }
 
-    fun deleteTask(taskId: String, onComplete: (Boolean) -> Unit) {
-        db.collection("tasks").document(taskId).delete()
+    fun deleteTask(uid: String, taskId: String, onComplete: (Boolean) -> Unit) {
+        getUserTasksCollection(uid).document(taskId).delete()
             .addOnCompleteListener { onComplete(it.isSuccessful) }
     }
 
-    fun completeTask(taskId: String, xpAwarded: Int, onComplete: (Boolean) -> Unit) {
-        db.collection("tasks").document(taskId)
+    fun completeTask(uid: String, taskId: String, xpAwarded: Int, onComplete: (Boolean) -> Unit) {
+        getUserTasksCollection(uid).document(taskId)
             .update(mapOf(
-                "completed"   to true,
+                "isCompleted" to true,
                 "completedAt" to Timestamp.now(),
                 "xpAwarded"   to xpAwarded
             ))

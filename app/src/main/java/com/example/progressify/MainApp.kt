@@ -104,24 +104,41 @@ class TaskViewModel : ViewModel() {
     }
 
     fun deleteTask(taskId: String) {
-        taskRepository.deleteTask(taskId) { success ->
-            if (success) tasks = tasks.filter { it.id != taskId }
-            else error = "Failed to delete task"
+        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        taskRepository.deleteTask(currentUserId, taskId) { success ->
+            if (success) {
+                tasks = tasks.filter { it.id != taskId }
+            } else {
+                error = "Failed to delete task"
+            }
         }
     }
 
     fun completeTask(task: Task) {
         if (task.isCompleted) return
+
         val completedTask = task.copy(isCompleted = true, completedAt = Timestamp.now())
         val xp = completedTask.calculateXp()
-        taskRepository.completeTask(task.id, xp) { success ->
+
+        taskRepository.completeTask(task.uid, task.id, xp) { success ->
             if (success) {
-                tasks = tasks.map { if (it.id == task.id) completedTask.copy(xpAwarded = xp) else it }
+                tasks = tasks.map {
+                    if (it.id == task.id) completedTask.copy(xpAwarded = xp) else it
+                }
+
                 xpGainedAnim = xp
                 currentXp += xp
-                while (currentXp >= xpToNextLevel) { currentXp -= xpToNextLevel; currentLevel++ }
+
+                while (currentXp >= xpToNextLevel) {
+                    currentXp -= xpToNextLevel
+                    currentLevel++
+                }
+
                 saveXpToFirestore()
-            } else error = "Failed to complete task"
+            } else {
+                error = "Failed to complete task"
+            }
         }
     }
 

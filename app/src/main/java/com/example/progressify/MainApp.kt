@@ -118,24 +118,30 @@ class TaskViewModel : ViewModel() {
     fun completeTask(task: Task) {
         if (task.isCompleted) return
 
-        val completedTask = task.copy(isCompleted = true, completedAt = Timestamp.now())
-        val xp = completedTask.calculateXp()
-
-        taskRepository.completeTask(task.uid, task.id, xp) { success ->
+        taskRepository.completeTask(task.uid, task.id) { success, xpFromDb ->
             if (success) {
                 tasks = tasks.map {
-                    if (it.id == task.id) completedTask.copy(xpAwarded = xp) else it
+                    if (it.id == task.id) {
+                        it.copy(
+                            isCompleted = true,
+                            completedAt = Timestamp.now(),
+                            xpAwarded = xpFromDb
+                        )
+                    } else it
                 }
 
-                xpGainedAnim = xp
-                currentXp += xp
+                triggerXpPopup(xpFromDb)
 
+                currentXp += xpFromDb
                 while (currentXp >= xpToNextLevel) {
                     currentXp -= xpToNextLevel
                     currentLevel++
                 }
 
                 saveXpToFirestore()
+
+                if (task.isRecurring) loadTasks()
+
             } else {
                 error = "Failed to complete task"
             }
@@ -148,7 +154,20 @@ class TaskViewModel : ViewModel() {
             .update(mapOf("experiencePoints" to currentXp, "level" to currentLevel))
     }
 
-    fun clearXpAnim() { xpGainedAnim = 0 }
+    var showXpPopup by mutableStateOf(false)
+        private set
+
+    fun triggerXpPopup(xp: Int) {
+        xpGainedAnim = xp
+        showXpPopup = true
+    }
+
+    fun clearXpAnim() {
+        showXpPopup = false
+    }
+    fun resetXpAfterAnimation() {
+        xpGainedAnim = -1
+    }
     fun clearError()  { error = null }
 }
 
@@ -351,12 +370,14 @@ fun TaskListScreen(user: User?, taskViewModel: TaskViewModel) {
     var selectedCategory by remember { mutableStateOf("All") }
     var showXpPopup      by remember { mutableStateOf(false) }
 
-    LaunchedEffect(taskViewModel.xpGainedAnim) {
-        if (taskViewModel.xpGainedAnim > 0) {
+    LaunchedEffect(taskViewModel.showXpPopup) {
+        if (taskViewModel.showXpPopup) {
             showXpPopup = true
             kotlinx.coroutines.delay(2000)
             showXpPopup = false
             taskViewModel.clearXpAnim()
+            kotlinx.coroutines.delay(500)
+            taskViewModel.resetXpAfterAnimation()
         }
     }
 

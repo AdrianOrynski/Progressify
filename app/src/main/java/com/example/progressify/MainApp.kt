@@ -1,8 +1,5 @@
 package com.example.progressify
 
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
-import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -27,8 +24,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -169,7 +175,27 @@ class TaskViewModel : ViewModel() {
         xpGainedAnim = -1
     }
     fun clearError()  { error = null }
+
+    val skillStats: List<SkillStat>
+        get() = TaskCategory.entries.map { cat ->
+            val catTasks = tasks.filter { it.category == cat.label }
+            val done     = catTasks.filter { it.isCompleted }
+            val totalXp  = done.sumOf { it.xpAwarded }
+            var lvl      = 1
+            var xpLeft   = totalXp
+            while (xpLeft >= lvl * 100) { xpLeft -= lvl * 100; lvl++ }
+            SkillStat(cat, lvl, xpLeft, lvl * 100, done.size, catTasks.size)
+        }
 }
+
+data class SkillStat(
+    val category: TaskCategory,
+    val level: Int,
+    val currentXp: Int,
+    val xpToNextLevel: Int,
+    val completedTasks: Int,
+    val totalTasks: Int
+)
 
 // ─────────────────────────────────────────────────────────────────
 // Bottom Nav
@@ -178,6 +204,7 @@ class TaskViewModel : ViewModel() {
 private sealed class NavItem(val route: String, val title: String, val icon: ImageVector) {
     object Dashboard : NavItem("dashboard", "Tavern",   Icons.Default.Home)
     object Tasks     : NavItem("tasks",     "Bounties", Icons.Default.List)
+    object Skills    : NavItem("skills",    "Skills",   Icons.Default.Star)
     object Profile   : NavItem("profile",   "Hero",     Icons.Default.Person)
 }
 
@@ -194,7 +221,7 @@ fun MainApp(user: User?) {
             val entry   by navController.currentBackStackEntryAsState()
             val current = entry?.destination?.route
             NavigationBar(containerColor = Color(0xFF0A0704), tonalElevation = 0.dp) {
-                listOf(NavItem.Dashboard, NavItem.Tasks, NavItem.Profile).forEach { item ->
+                listOf(NavItem.Dashboard, NavItem.Tasks, NavItem.Skills, NavItem.Profile).forEach { item ->
                     NavigationBarItem(
                         icon     = { Icon(item.icon, contentDescription = item.title) },
                         label    = { Text(item.title, fontWeight = FontWeight.Bold,
@@ -227,6 +254,7 @@ fun MainApp(user: User?) {
         ) {
             composable(NavItem.Dashboard.route) { DashboardScreen(user, taskViewModel) }
             composable(NavItem.Tasks.route)     { TaskListScreen(user, taskViewModel) }
+            composable(NavItem.Skills.route)    { SkillsScreen(taskViewModel) }
             composable(NavItem.Profile.route)   { ProfileScreen(user, taskViewModel) }
         }
     }
@@ -627,8 +655,12 @@ fun AddTaskDialog(
     var selectedDays   by remember { mutableStateOf(setOf<Int>()) }
     var interval       by remember { mutableIntStateOf(1) }
 
-    val context  = LocalContext.current
-    val dateFmt  = SimpleDateFormat("dd MMM", Locale.getDefault())
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker   by remember { mutableStateOf(false) }
+    var showEndTimePicker   by remember { mutableStateOf(false) }
+
+    val dateFmt = SimpleDateFormat("dd MMM", Locale.getDefault())
 
     fun buildTimestamp(date: Triple<Int, Int, Int>?, hour: Int?, minute: Int?): Timestamp? {
         if (date == null || hour == null || minute == null) return null
@@ -810,16 +842,8 @@ fun AddTaskDialog(
                     date       = startDate,
                     hour       = startHour,
                     minute     = startMinute,
-                    onPickDate = {
-                        showDatePicker(context) { y, m, d ->
-                            startDate = Triple(y, m, d); timeError = false
-                        }
-                    },
-                    onPickTime = {
-                        showTimePicker(context) { h, min ->
-                            startHour = h; startMinute = min; timeError = false
-                        }
-                    }
+                    onPickDate = { showStartDatePicker = true },
+                    onPickTime = { showStartTimePicker = true }
                 )
 
                 Spacer(Modifier.height(6.dp))
@@ -829,16 +853,8 @@ fun AddTaskDialog(
                     date       = endDate,
                     hour       = endHour,
                     minute     = endMinute,
-                    onPickDate = {
-                        showDatePicker(context) { y, m, d ->
-                            endDate = Triple(y, m, d); timeError = false
-                        }
-                    },
-                    onPickTime = {
-                        showTimePicker(context) { h, min ->
-                            endHour = h; endMinute = min; timeError = false
-                        }
-                    }
+                    onPickDate = { showEndDatePicker = true },
+                    onPickTime = { showEndTimePicker = true }
                 )
 
                 if (timeError) Text("Set start and end date & time",
@@ -958,6 +974,31 @@ fun AddTaskDialog(
             }
         }
     }
+
+    if (showStartDatePicker) {
+        FantasyDatePickerDialog(
+            onDismiss = { showStartDatePicker = false },
+            onConfirm = { y, m, d -> startDate = Triple(y, m, d); timeError = false; showStartDatePicker = false }
+        )
+    }
+    if (showStartTimePicker) {
+        FantasyTimePickerDialog(
+            onDismiss = { showStartTimePicker = false },
+            onConfirm = { h, min -> startHour = h; startMinute = min; timeError = false; showStartTimePicker = false }
+        )
+    }
+    if (showEndDatePicker) {
+        FantasyDatePickerDialog(
+            onDismiss = { showEndDatePicker = false },
+            onConfirm = { y, m, d -> endDate = Triple(y, m, d); timeError = false; showEndDatePicker = false }
+        )
+    }
+    if (showEndTimePicker) {
+        FantasyTimePickerDialog(
+            onDismiss = { showEndTimePicker = false },
+            onConfirm = { h, min -> endHour = h; endMinute = min; timeError = false; showEndTimePicker = false }
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1033,21 +1074,243 @@ fun ProfileScreen(user: User?, taskViewModel: TaskViewModel) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Picker helpers
+// Skills
 // ─────────────────────────────────────────────────────────────────
 
-private fun showTimePicker(context: Context, onResult: (Int, Int) -> Unit) {
-    val now = Calendar.getInstance()
-    TimePickerDialog(context, { _, hour, minute ->
-        onResult(hour, minute)
-    }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), true).show()
+@Composable
+fun SkillsScreen(taskViewModel: TaskViewModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(DarkWood, ShadowBlack.copy(alpha = 0.6f), DarkWood)))
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        Text("⚗️ SKILL GRIMOIRE",
+            style    = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = FantasyGold),
+            modifier = Modifier.padding(bottom = 6.dp, top = 16.dp))
+        Text("Hone your disciplines to unleash greater power",
+            style    = MaterialTheme.typography.bodyMedium, color = ParchmentDim,
+            modifier = Modifier.padding(bottom = 24.dp))
+
+        taskViewModel.skillStats.forEach { stat ->
+            SkillCard(stat)
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Spacer(Modifier.height(16.dp))
+    }
 }
 
-private fun showDatePicker(context: Context, onResult: (Int, Int, Int) -> Unit) {
-    val now = Calendar.getInstance()
-    DatePickerDialog(context, { _, year, month, day ->
-        onResult(year, month, day)
-    }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH)).show()
+@Composable
+private fun SkillCard(stat: SkillStat) {
+    val color  = skillColor(stat.category)
+    val emoji  = skillIcon(stat.category)
+    val animatedProgress by animateFloatAsState(
+        targetValue   = (stat.currentXp.toFloat() / stat.xpToNextLevel).coerceIn(0f, 1f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label         = "skill_${stat.category.name}"
+    )
+    FantasyCard(borderColor = color.copy(alpha = 0.6f), borderWidth = 1.dp,
+        gradient = listOf(AncientBrownLight, AncientBrown)) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 14.dp)) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(color.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                    .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+            ) {
+                Text(emoji, fontSize = 26.sp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stat.category.label,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = Parchment)
+                    Box(
+                        modifier = Modifier
+                            .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                            .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text("LVL ${stat.level}",
+                            style      = MaterialTheme.typography.labelLarge,
+                            color      = color,
+                            fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(skillSubtitle(stat.category),
+                    style = MaterialTheme.typography.bodyMedium, color = ParchmentDim)
+            }
+        }
+        Row(
+            modifier              = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Text("${stat.completedTasks} tasks completed",
+                style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
+            Text("${stat.currentXp} / ${stat.xpToNextLevel} XP",
+                style = MaterialTheme.typography.labelSmall, color = color,
+                fontWeight = FontWeight.Bold)
+        }
+        LinearProgressIndicator(
+            progress   = { animatedProgress },
+            modifier   = Modifier.fillMaxWidth().height(10.dp),
+            color      = color,
+            trackColor = color.copy(alpha = 0.15f),
+            strokeCap  = StrokeCap.Round
+        )
+    }
+}
+
+private fun skillColor(category: TaskCategory): Color = when (category) {
+    TaskCategory.SPELLCRAFT       -> Color(0xFF9C27B0)
+    TaskCategory.TASKFORGE        -> Color(0xFFFF6D00)
+    TaskCategory.BARDS_DELIGHT    -> Color(0xFF03A9F4)
+    TaskCategory.SCHOLARS_SANCTUM -> Color(0xFF4CAF50)
+    TaskCategory.CYCLE_OF_ORDER   -> Color(0xFF9E9E9E)
+    TaskCategory.BODYFORGE        -> Color(0xFFF44336)
+}
+
+private fun skillIcon(category: TaskCategory): String = when (category) {
+    TaskCategory.SPELLCRAFT       -> "✨"
+    TaskCategory.TASKFORGE        -> "⚒️"
+    TaskCategory.BARDS_DELIGHT    -> "🎵"
+    TaskCategory.SCHOLARS_SANCTUM -> "📚"
+    TaskCategory.CYCLE_OF_ORDER   -> "⚙️"
+    TaskCategory.BODYFORGE        -> "💪"
+}
+
+private fun skillSubtitle(category: TaskCategory): String = when (category) {
+    TaskCategory.SPELLCRAFT       -> "Spells & Enchantments"
+    TaskCategory.TASKFORGE        -> "Crafting & Productivity"
+    TaskCategory.BARDS_DELIGHT    -> "Arts & Creativity"
+    TaskCategory.SCHOLARS_SANCTUM -> "Knowledge & Study"
+    TaskCategory.CYCLE_OF_ORDER   -> "Habits & Organization"
+    TaskCategory.BODYFORGE        -> "Fitness & Health"
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Picker dialogs
+// ─────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FantasyDatePickerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int, Int) -> Unit
+) {
+    val state = rememberDatePickerState()
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        val cal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = millis }
+                        onConfirm(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
+                    }
+                    onDismiss()
+                },
+                shape  = RoundedCornerShape(4.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = DeepDragonRed)
+            ) { Text("CONFIRM", color = Parchment, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss, shape = RoundedCornerShape(4.dp),
+                border  = BorderStroke(1.dp, ParchmentDim)
+            ) { Text("CANCEL", color = ParchmentDim) }
+        },
+        shape  = RoundedCornerShape(12.dp),
+        colors = DatePickerDefaults.colors(containerColor = AncientBrown)
+    ) {
+        DatePicker(
+            state  = state,
+            colors = DatePickerDefaults.colors(
+                containerColor             = AncientBrown,
+                titleContentColor          = FantasyGold,
+                headlineContentColor       = Parchment,
+                weekdayContentColor        = ParchmentDim,
+                subheadContentColor        = ParchmentDim,
+                navigationContentColor     = FantasyGold,
+                yearContentColor           = Parchment,
+                currentYearContentColor    = FantasyGold,
+                selectedYearContentColor   = Parchment,
+                selectedYearContainerColor = DeepDragonRed,
+                dayContentColor            = Parchment,
+                disabledDayContentColor    = IronGray,
+                selectedDayContentColor    = DarkWood,
+                selectedDayContainerColor  = FantasyGold,
+                todayContentColor          = FantasyGold,
+                todayDateBorderColor       = FantasyGold,
+            )
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FantasyTimePickerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit
+) {
+    val state = rememberTimePickerState(is24Hour = true)
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .background(Brush.verticalGradient(listOf(AncientBrown, DarkWood)), RoundedCornerShape(12.dp))
+                .border(1.5.dp, FantasyGold, RoundedCornerShape(12.dp))
+                .padding(24.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("SELECT TIME",
+                    style    = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    color    = FantasyGold,
+                    modifier = Modifier.align(Alignment.Start).padding(bottom = 20.dp))
+                TimePicker(
+                    state  = state,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor                       = AncientBrownLight,
+                        clockDialSelectedContentColor        = DarkWood,
+                        clockDialUnselectedContentColor      = Parchment,
+                        selectorColor                        = FantasyGold,
+                        containerColor                       = Color.Transparent,
+                        periodSelectorBorderColor            = FantasyGold,
+                        timeSelectorSelectedContainerColor   = DeepDragonRed,
+                        timeSelectorUnselectedContainerColor = AncientBrownLight,
+                        timeSelectorSelectedContentColor     = FantasyGold,
+                        timeSelectorUnselectedContentColor   = ParchmentDim,
+                    )
+                )
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick  = onDismiss, modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(4.dp),
+                        border   = BorderStroke(1.dp, ParchmentDim)
+                    ) { Text("CANCEL", color = ParchmentDim) }
+                    Button(
+                        onClick  = { onConfirm(state.hour, state.minute); onDismiss() },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(4.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = DeepDragonRed)
+                    ) { Text("CONFIRM", color = Parchment, fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────

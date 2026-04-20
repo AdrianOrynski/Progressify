@@ -14,6 +14,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import com.example.progressify.screens.auth.LoginScreen
+import com.example.progressify.screens.auth.RegisterScreen
 import com.example.progressify.ui.theme.ProgressifyTheme
 import com.google.firebase.auth.FirebaseAuth
 

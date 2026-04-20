@@ -84,10 +84,8 @@ data class Task(
     fun calculateXp(now: Timestamp = Timestamp.now()): Int {
         val diff = try { Difficulty.valueOf(difficulty) } catch (e: Exception) { Difficulty.MEDIUM }
         val base = diff.xpBase.toFloat()
-
         val durationMinutes = getDuration()?.toMinutes()?.toFloat() ?: 0f
         val scaler = durationMinutes / 60f
-
         val rawXP = (base * scaler * getTimeDiff(now)).toInt()
         val roundedXp = (Math.round(rawXP / 10.0) * 10).toInt()
         return roundedXp
@@ -95,8 +93,7 @@ data class Task(
 
     fun getDuration(): Duration? {
         val start = startTime?.toInstant() ?: return null
-        val end = endTime?.toInstant() ?: return null
-
+        val end = endTime?.toInstant()   ?: return null
         return Duration.between(start, end)
     }
 
@@ -104,22 +101,17 @@ data class Task(
         val start = startTime?.toInstant() ?: return 0f
         val end = endTime?.toInstant() ?: return 0f
         val completed = now.toInstant()
-
         val spentMillis = Duration.between(start, completed).toMillis().toFloat()
         val totalTaskMillis = Duration.between(start, end).toMillis().toFloat()
-
         if (totalTaskMillis <= 0f) return 1f
-
         val ratio = (spentMillis / totalTaskMillis).coerceIn(0f, 1f)
         return round(ratio * 10) / 10f
     }
 
     fun createNextOccurrence(): Task? {
         if (!isRecurring) return null
-
         val startDate = startTime?.toDate() ?: return null
         val endDate = endTime?.toDate()
-
         val zoneId = ZoneId.systemDefault()
         val startZdt = startDate.toInstant().atZone(zoneId)
 
@@ -128,34 +120,23 @@ data class Task(
             RecurrenceType.WEEKLY.name -> startZdt.plusWeeks(recurrence.interval.toLong())
             RecurrenceType.MONTHLY.name -> startZdt.plusMonths(recurrence.interval.toLong())
             RecurrenceType.YEARLY.name -> startZdt.plusYears(recurrence.interval.toLong())
-
             RecurrenceType.SELECTED_DAYS.name -> {
                 if (recurrence.selectedDays.isEmpty()) return null
-
                 val currentDayOfWeek = startZdt.dayOfWeek.value
                 val sortedDays = recurrence.selectedDays.sorted()
-
                 val nextDay = sortedDays.firstOrNull { it > currentDayOfWeek }
-
-                val daysToAdd = if (nextDay != null) {
-                    nextDay - currentDayOfWeek
-                } else {
-                    (7 - currentDayOfWeek) + sortedDays.first()
-                }
-
+                val daysToAdd = if (nextDay != null) nextDay - currentDayOfWeek
+                else (7 - currentDayOfWeek) + sortedDays.first()
                 startZdt.plusDays(daysToAdd.toLong())
             }
             else -> return null
         }
 
         val newStartTime = Timestamp(Date.from(nextStartZdt.toInstant()))
-        var newEndTime: Timestamp? = null
-
-        if (endDate != null) {
-            val endZdt = endDate.toInstant().atZone(zoneId)
-            val durationMillis = ChronoUnit.MILLIS.between(startZdt, endZdt)
-            val nextEndZdt = nextStartZdt.plus(durationMillis, ChronoUnit.MILLIS)
-            newEndTime = Timestamp(Date.from(nextEndZdt.toInstant()))
+        val newEndTime = endDate?.let {
+            val endZdt = it.toInstant().atZone(zoneId)
+            val durationMs = ChronoUnit.MILLIS.between(startZdt, endZdt)
+            Timestamp(Date.from(nextStartZdt.plus(durationMs, ChronoUnit.MILLIS).toInstant()))
         }
 
         return this.copy(
@@ -169,81 +150,238 @@ data class Task(
     }
 }
 
-// ── Repository ───────────────────────────────────────────────────
+// ── CategoryStats model ───────────────────────────────────────────
+//
+// Storage in: users/{uid}/categories/{categoryName}
+//
+data class CategoryStats(
+    val level              : Int = 1,
+    val exp                : Int = 0,
+    val completedTasksCount: Int = 0
+)
+
+// ── TaskRepository ────────────────────────────────────────────────
+//
+// New Firestore Structure:
+//
+//   users/{uid}
+//     ├── completedTasksCount: Int
+//     └── categories/{categoryName}
+//           ├── active/{taskId}
+//           ├── completed/{taskId}
+//           └── deleted/{taskId}
+//
 class TaskRepository {
     private val db = FirebaseFirestore.getInstance()
 
-    private fun getUserTasksCollection(uid: String) =
-        db.collection("users").document(uid).collection("tasks")
+    // ── Path Helpers ─────────────────────────────────────────
 
-    fun getTasks(uid: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
-        getUserTasksCollection(uid)
-            .get()
-            .addOnSuccessListener { documents ->
-                val tasks = documents.mapNotNull { it.toObject(Task::class.java) }
-                onSuccess(tasks)
-            }
-            .addOnFailureListener { onFailure(it) }
+    private fun categoryDoc(uid: String, category: String) =
+        db.collection("users").document(uid)
+            .collection("categories").document(category)
+
+    private fun activeColl(uid: String, category: String) =
+        categoryDoc(uid, category).collection("active")
+
+    private fun completedColl(uid: String, category: String) =
+        categoryDoc(uid, category).collection("completed")
+
+    private fun deletedColl(uid: String, category: String) =
+        categoryDoc(uid, category).collection("deleted")
+
+    // ── Loading tasks ──────────────────────────────────────────
+
+    fun getTasks(
+        uid      : String,
+        onSuccess: (List<Task>) -> Unit,
+        onFailure: (Exception)  -> Unit
+    ) {
+        val categories = TaskCategory.entries.map { it.name }
+        val allTasks   = mutableListOf<Task>()
+        var remaining  = categories.size * 2
+        if (categories.isEmpty()) { onSuccess(emptyList()); return }
+        for (cat in categories) {
+            activeColl(uid, cat).get()
+                .addOnSuccessListener { docs ->
+                    synchronized(allTasks) {
+                        val tasks = docs.mapNotNull { doc ->
+                            doc.toObject(Task::class.java)?.copy(id = doc.id)  // ← fix
+                        }
+                        allTasks += tasks
+                        if (--remaining == 0) onSuccess(allTasks)
+                    }
+                }
+                .addOnFailureListener {
+                    synchronized(allTasks) {
+                        if (--remaining == 0) onSuccess(allTasks)
+                    }
+                }
+            completedColl(uid, cat).get()
+                .addOnSuccessListener { docs ->
+                    synchronized(allTasks) {
+                        val tasks = docs.mapNotNull { doc ->
+                            doc.toObject(Task::class.java)?.copy(isCompleted = true, id = doc.id)  // ← fix
+                        }
+                        allTasks += tasks
+                        if (--remaining == 0) onSuccess(allTasks)
+                    }
+                }
+                .addOnFailureListener {
+                    synchronized(allTasks) {
+                        if (--remaining == 0) onSuccess(allTasks)
+                    }
+                }
+        }
     }
+
+    fun getTasksByCategory(
+        uid      : String,
+        category : String,
+        onSuccess: (List<Task>) -> Unit,
+        onFailure: (Exception)  -> Unit
+    ) {
+        activeColl(uid, category).get()
+            .addOnSuccessListener { docs ->
+                onSuccess(docs.mapNotNull { doc ->
+                    doc.toObject(Task::class.java)?.copy(id = doc.id)  // ← fix
+                })
+            }
+            .addOnFailureListener(onFailure)
+    }
+
+    fun getCategoryStats(
+        uid      : String,
+        category : String,
+        onSuccess: (CategoryStats) -> Unit,
+        onFailure: (Exception)     -> Unit
+    ) {
+        categoryDoc(uid, category).get()
+            .addOnSuccessListener { doc ->
+                onSuccess(doc.toObject(CategoryStats::class.java) ?: CategoryStats())
+            }
+            .addOnFailureListener(onFailure)
+    }
+
+    // ── Add Task ─────────────────────────────────────────
 
     fun addTask(task: Task, onComplete: (Boolean) -> Unit) {
-        if (task.uid.isEmpty()) {
-            onComplete(false)
-            return
-        }
+        if (task.uid.isEmpty() || task.category.isEmpty()) { onComplete(false); return }
 
-        val taskRef = getUserTasksCollection(task.uid).document()
+        val catKey  = TaskCategory.entries.firstOrNull { it.label == task.category }?.name
+            ?: task.category
+        val taskRef = activeColl(task.uid, catKey).document()
         val taskWithId = task.copy(id = taskRef.id)
 
-        taskRef.set(taskWithId)
-            .addOnCompleteListener { onComplete(it.isSuccessful) }
+        val catRef = categoryDoc(task.uid, catKey)
+        db.runTransaction { tx ->
+            val snap = tx.get(catRef)
+            if (!snap.exists()) tx.set(catRef, CategoryStats())
+            tx.set(taskRef, taskWithId)
+        }.addOnCompleteListener { onComplete(it.isSuccessful) }
     }
 
-    fun deleteTask(uid: String, taskId: String, onComplete: (Boolean) -> Unit) {
-        getUserTasksCollection(uid).document(taskId).delete()
-            .addOnCompleteListener { onComplete(it.isSuccessful) }
+    // ── Delete Task  (soft-delete to deleted collection) ─────────
+
+    fun deleteTask(
+        uid      : String,
+        taskId   : String,
+        category : String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        val catKey    = TaskCategory.entries.firstOrNull { it.label == category }?.name ?: category
+        val activeRef = activeColl(uid, catKey).document(taskId)
+        val backupRef = deletedColl(uid, catKey).document(taskId)
+
+        activeRef.get().addOnSuccessListener { doc ->
+            if (doc.exists()) {
+                val task = doc.toObject(Task::class.java)
+                if (task == null) { onComplete(false); return@addOnSuccessListener }
+                val batch = db.batch()
+                batch.set(backupRef, task)
+                batch.delete(activeRef)
+                batch.commit().addOnCompleteListener { onComplete(it.isSuccessful) }
+            } else {
+                val completedRef = completedColl(uid, catKey).document(taskId)
+                completedRef.get().addOnSuccessListener { completedDoc ->
+                    val task = completedDoc.toObject(Task::class.java)
+                    if (task == null) { onComplete(false); return@addOnSuccessListener }
+                    val batch = db.batch()
+                    batch.set(backupRef, task)
+                    batch.delete(completedRef)
+                    batch.commit().addOnCompleteListener { onComplete(it.isSuccessful) }
+                }.addOnFailureListener { onComplete(false) }
+            }
+        }.addOnFailureListener { onComplete(false) }
     }
 
-    fun completeTask(uid: String, taskId: String, onComplete: (Boolean, Int) -> Unit) {
-        if (taskId.isBlank()) {
-            onComplete(false, 0)
-            return
-        }
+    // ── Completing Task ─────────────────────────────────────────
 
-        val taskRef = getUserTasksCollection(uid).document(taskId)
+    fun completeTask(
+        uid       : String,
+        taskId    : String,
+        category  : String,
+        onComplete: (Boolean, Int) -> Unit
+    ) {
+        if (taskId.isBlank()) { onComplete(false, 0); return }
 
-        taskRef.get().addOnSuccessListener { document ->
-            val task =
-                document.toObject(Task::class.java) ?: return@addOnSuccessListener onComplete(
-                    false,
-                    0
-                )
+        val catKey       = TaskCategory.entries.firstOrNull { it.label == category }?.name ?: category
+        val activeRef    = activeColl(uid, catKey).document(taskId)
+        val completedRef = completedColl(uid, catKey).document(taskId)
+        val catRef       = categoryDoc(uid, catKey)
+        val userRef      = db.collection("users").document(uid)
 
-            val batch = db.batch()
-            val now = Timestamp.now()
+        db.runTransaction { tx ->
+            val taskSnap = tx.get(activeRef)
+            val catSnap  = tx.get(catRef)
+            val userSnap = tx.get(userRef)
+
+            val task  = taskSnap.toObject(Task::class.java) ?: throw Exception("Task not found")
+            val stats = catSnap.toObject(CategoryStats::class.java) ?: CategoryStats()
+
+            val now          = Timestamp.now()
             val calculatedXp = task.calculateXp(now)
-            batch.update(
-                taskRef, mapOf(
-                    "isCompleted" to true,
-                    "completedAt" to now,
-                    "xpAwarded" to calculatedXp
-                )
+            val completedTask = task.copy(
+                isCompleted = true,
+                completedAt = now,
+                xpAwarded   = calculatedXp
             )
 
-            try {
-                val nextTask = task.createNextOccurrence()
-                if (nextTask != null) {
-                    val nextTaskRef = getUserTasksCollection(uid).document()
-                    batch.set(nextTaskRef, nextTask.copy(id = nextTaskRef.id, uid = uid))
-                }
-            } catch (e: Exception) { /* log error */
-            }
+            // 1. Move Task: active to completed
+            tx.set(completedRef, completedTask)
+            tx.delete(activeRef)
 
-            batch.commit().addOnCompleteListener {
-                onComplete(it.isSuccessful, if (it.isSuccessful) calculatedXp else 0)
-            }
-        }.addOnFailureListener {
-            onComplete(false, 0)
+            // 2. Update category stats
+            val newExp   = stats.exp + calculatedXp
+            val newLevel = computeLevel(newExp)
+            tx.set(catRef, CategoryStats(
+                level               = newLevel,
+                exp                 = newExp,
+                completedTasksCount = stats.completedTasksCount + 1
+            ))
+
+            // 3. Update global tasks data
+            val currentCount = userSnap.getLong("completedTasksCount")?.toInt() ?: 0
+            tx.update(userRef, "completedTasksCount", currentCount + 1)
+
+            calculatedXp
         }
+            .addOnSuccessListener { xp -> onComplete(true, xp as Int) }
+            .addOnFailureListener  { onComplete(false, 0) }
+    }
+
+    // ── Recursion─────────────────────────
+
+    fun scheduleNextOccurrence(uid: String, task: Task, onComplete: (Boolean) -> Unit) {
+        val next = task.createNextOccurrence() ?: run { onComplete(false); return }
+        addTask(next.copy(uid = uid), onComplete)
+    }
+
+    // ── Private Helpers ──────────────────────────────────────────
+
+    private fun computeLevel(totalExp: Int): Int {
+        var lvl  = 1
+        var left = totalExp
+        while (left >= lvl * 100) { left -= lvl * 100; lvl++ }
+        return lvl
     }
 }

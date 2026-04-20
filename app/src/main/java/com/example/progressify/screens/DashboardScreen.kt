@@ -97,7 +97,7 @@ fun DashboardScreen(user: User?, taskViewModel: TaskViewModel) {
             StatCard("Level", "${taskViewModel.currentLevel}", modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.Star, null, tint = FantasyGold, modifier = Modifier.size(26.dp))
             }
-            StatCard("Done", "${taskViewModel.tasks.count { it.isCompleted }}", modifier = Modifier.weight(1f)) {
+            StatCard("Done", "${user?.completedTasksCount ?: 0}", modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.CheckCircle, null, tint = FantasyGold, modifier = Modifier.size(26.dp))
             }
         }
@@ -117,7 +117,7 @@ fun DashboardScreen(user: User?, taskViewModel: TaskViewModel) {
             LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                 items(activeTasks, key = { it.id }) { task ->
                     TaskCard(task = task, onComplete = { taskViewModel.completeTask(task) },
-                        onDelete = { taskViewModel.deleteTask(task.id) }, showDelete = false)
+                        onDelete = { taskViewModel.deleteTask(task) }, showDelete = false)
                     Spacer(Modifier.height(8.dp))
                 }
             }

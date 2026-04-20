@@ -130,10 +130,10 @@ private fun skillIcon(category: TaskCategory): String = when (category) {
 }
 
 private fun skillSubtitle(category: TaskCategory): String = when (category) {
-    TaskCategory.SPELLCRAFT       -> "Spells & Enchantments"
-    TaskCategory.TASKFORGE        -> "Crafting & Productivity"
-    TaskCategory.BARDS_DELIGHT    -> "Arts & Creativity"
-    TaskCategory.SCHOLARS_SANCTUM -> "Knowledge & Study"
-    TaskCategory.CYCLE_OF_ORDER   -> "Habits & Organization"
-    TaskCategory.BODYFORGE        -> "Fitness & Health"
+    TaskCategory.SPELLCRAFT       -> "Innovation & Design"
+    TaskCategory.TASKFORGE        -> "Execution & Work"
+    TaskCategory.BARDS_DELIGHT    -> "Expression & Leisure"
+    TaskCategory.SCHOLARS_SANCTUM -> "Learning & Research"
+    TaskCategory.CYCLE_OF_ORDER   -> "Routine & Structure"
+    TaskCategory.BODYFORGE        -> "Strength & Vitality"
 }

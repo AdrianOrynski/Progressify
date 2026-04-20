@@ -80,7 +80,7 @@ fun ProfileScreen(user: User?, taskViewModel: TaskViewModel) {
             Spacer(Modifier.height(12.dp))
             ProfileRow("Level",           "${taskViewModel.currentLevel}")
             ProfileRow("Experience",      "${taskViewModel.currentXp} / ${taskViewModel.xpToNextLevel} XP")
-            ProfileRow("Tasks Completed", "${taskViewModel.tasks.count { it.isCompleted }}")
+            ProfileRow("Tasks Completed", "${user?.completedTasksCount ?: 0}")
             ProfileRow("Tasks Active",    "${taskViewModel.tasks.count { !it.isCompleted }}")
             ProfileRow("Overdue",         "${taskViewModel.tasks.count { it.isOverdue }}")
             user?.createdAt?.let { ProfileRow("Member since", it.toDate().toLocaleString()) }

@@ -9,5 +9,6 @@ data class User(
     val nickname: String = "",
     val createdAt: Timestamp? = null,
     val experiencePoints: Int = 0,
-    val level: Int = 1
+    val level: Int = 1,
+    val completedTasksCount: Int        = 0
 )

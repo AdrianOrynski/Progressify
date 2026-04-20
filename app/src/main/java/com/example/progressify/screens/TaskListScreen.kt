@@ -119,7 +119,7 @@ fun TaskListScreen(user: User?, taskViewModel: TaskViewModel) {
                             items(sorted, key = { it.id }) { task ->
                                 TaskCard(task = task,
                                     onComplete = { taskViewModel.completeTask(task) },
-                                    onDelete   = { taskViewModel.deleteTask(task.id) },
+                                    onDelete   = { taskViewModel.deleteTask(task) },
                                     showDelete = true)
                             }
                         }

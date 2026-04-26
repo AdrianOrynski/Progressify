@@ -1,13 +1,14 @@
 package com.example.progressify.viewmodel
 
+import android.app.Application
 import androidx.compose.runtime.*
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import com.example.progressify.*
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
-class TaskViewModel : ViewModel() {
+class TaskViewModel(app: Application) : AndroidViewModel(app) {
     private val taskRepository = TaskRepository()
     private val db             = FirebaseFirestore.getInstance()
     private val uid get()      = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -117,14 +118,20 @@ class TaskViewModel : ViewModel() {
             endTime     = endTime,
             recurrence  = recurrence
         )
-        taskRepository.addTask(task) { success ->
-            if (success) loadTasks() else error = "Failed to add task"
+        taskRepository.addTask(task) { createdTask ->
+            if (createdTask != null) {
+                loadTasks()
+                NotificationScheduler.schedule(getApplication(), createdTask)
+            } else {
+                error = "Failed to add task"
+            }
         }
     }
 
     // ── Delete Task ──────────────────────────────────────────
 
     fun deleteTask(task: Task) {
+        NotificationScheduler.cancel(getApplication(), task)
         taskRepository.deleteTask(uid, task.id, task.category) { success ->
             if (success) tasks = tasks.filter { it.id != task.id }
             else error = "Failed to delete task"
@@ -136,28 +143,25 @@ class TaskViewModel : ViewModel() {
     fun completeTask(task: Task) {
         if (task.isCompleted) return
 
+        NotificationScheduler.cancel(getApplication(), task)
+
         taskRepository.completeTask(uid, task.id, task.category) { success, xpFromDb ->
             if (success) {
-                // Delete from active
                 loadTasks()
-
                 triggerXpPopup(xpFromDb)
-
-                // Update Global XP/level of user
                 currentXp += xpFromDb
                 while (currentXp >= xpToNextLevel) { currentXp -= xpToNextLevel; currentLevel++ }
                 saveXpToFirestore()
 
-                // Refresh category stats
                 val cat = TaskCategory.entries.firstOrNull { it.label == task.category }
                 if (cat != null) refreshCategoryStat(cat)
 
-                // Schedule your next recurring event
                 if (task.isRecurring) {
-                    taskRepository.scheduleNextOccurrence(uid, task) { scheduled ->
-                        if (scheduled) loadTasksForCategory(
-                            TaskCategory.entries.first { it.label == task.category }
-                        )
+                    taskRepository.scheduleNextOccurrence(uid, task) { nextTask ->
+                        if (nextTask != null) {
+                            loadTasksForCategory(TaskCategory.entries.first { it.label == task.category })
+                            NotificationScheduler.schedule(getApplication(), nextTask)
+                        }
                     }
                 }
             } else {

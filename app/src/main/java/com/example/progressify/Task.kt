@@ -264,8 +264,8 @@ class TaskRepository {
 
     // ── Add Task ─────────────────────────────────────────
 
-    fun addTask(task: Task, onComplete: (Boolean) -> Unit) {
-        if (task.uid.isEmpty() || task.category.isEmpty()) { onComplete(false); return }
+    fun addTask(task: Task, onComplete: (Task?) -> Unit) {
+        if (task.uid.isEmpty() || task.category.isEmpty()) { onComplete(null); return }
 
         val catKey  = TaskCategory.entries.firstOrNull { it.label == task.category }?.name
             ?: task.category
@@ -277,7 +277,7 @@ class TaskRepository {
             val snap = tx.get(catRef)
             if (!snap.exists()) tx.set(catRef, CategoryStats())
             tx.set(taskRef, taskWithId)
-        }.addOnCompleteListener { onComplete(it.isSuccessful) }
+        }.addOnCompleteListener { result -> onComplete(if (result.isSuccessful) taskWithId else null) }
     }
 
     // ── Delete Task  (soft-delete to deleted collection) ─────────
@@ -371,8 +371,8 @@ class TaskRepository {
 
     // ── Recursion─────────────────────────
 
-    fun scheduleNextOccurrence(uid: String, task: Task, onComplete: (Boolean) -> Unit) {
-        val next = task.createNextOccurrence() ?: run { onComplete(false); return }
+    fun scheduleNextOccurrence(uid: String, task: Task, onComplete: (Task?) -> Unit) {
+        val next = task.createNextOccurrence() ?: run { onComplete(null); return }
         addTask(next.copy(uid = uid), onComplete)
     }
 

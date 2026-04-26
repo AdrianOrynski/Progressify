@@ -18,11 +18,17 @@ class TaskViewModel : ViewModel() {
         private set
     var error      by mutableStateOf<String?>(null)
         private set
-    var currentXp    by mutableIntStateOf(0)
+    var currentXp     by mutableIntStateOf(0)
         private set
-    var currentLevel by mutableIntStateOf(1)
+    var currentLevel  by mutableIntStateOf(1)
         private set
-    var xpGainedAnim by mutableIntStateOf(0)
+    var xpGainedAnim  by mutableIntStateOf(0)
+        private set
+    var currentStreak  by mutableIntStateOf(0)
+        private set
+    var longestStreak  by mutableIntStateOf(0)
+        private set
+    var streakDates    by mutableStateOf<Set<String>>(emptySet())
         private set
 
     var categoryStats by mutableStateOf<Map<TaskCategory, CategoryStats>>(emptyMap())
@@ -81,7 +87,13 @@ class TaskViewModel : ViewModel() {
     // ── User data synchronization ─────────────────────────
 
     fun syncXpFromUser(user: User?) {
-        user?.let { currentXp = it.experiencePoints; currentLevel = it.level }
+        user?.let {
+            currentXp     = it.experiencePoints
+            currentLevel  = it.level
+            currentStreak = it.currentStreak
+            longestStreak = it.longestStreak
+            streakDates   = it.streakDates.toSet()
+        }
     }
 
     // ── Add Task ─────────────────────────────────────────

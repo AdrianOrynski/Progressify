@@ -72,6 +72,54 @@ fun ProfileScreen(user: User?, taskViewModel: TaskViewModel) {
 
         Spacer(Modifier.height(16.dp))
 
+        FantasyCard(borderColor = when {
+            taskViewModel.currentStreak >= 30 -> DragonRedLight
+            taskViewModel.currentStreak >= 7  -> DragonRedLight.copy(alpha = 0.7f)
+            taskViewModel.currentStreak >= 3  -> FantasyGold
+            else                              -> FantasyGoldDim.copy(alpha = 0.5f)
+        }, borderWidth = if (taskViewModel.currentStreak >= 7) 2.dp else 1.5.dp) {
+            Text("DAILY VOW", style = MaterialTheme.typography.labelLarge,
+                color = FantasyGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    StreakFlameIndicator(streak = taskViewModel.currentStreak)
+                    Spacer(Modifier.height(4.dp))
+                    Text("CURRENT", style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
+                }
+                Box(modifier = Modifier
+                    .width(1.dp)
+                    .height(72.dp)
+                    .background(FantasyGoldDim.copy(alpha = 0.3f))
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🏆", fontSize = 28.sp)
+                    Text(
+                        text = "${taskViewModel.longestStreak}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = FantasyGoldDim,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text("BEST", style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        FantasyCard(borderColor = FantasyGoldDim.copy(alpha = 0.5f), borderWidth = 1.dp,
+            gradient = listOf(AncientBrown.copy(alpha = 0.8f), DarkWood)) {
+            Text("FLAME CALENDAR", style = MaterialTheme.typography.labelLarge,
+                color = FantasyGold, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp))
+            StreakCalendar(streakDates = taskViewModel.streakDates)
+        }
+
+        Spacer(Modifier.height(16.dp))
+
         FantasyCard(borderColor = FantasyGoldDim, borderWidth = 1.dp,
             gradient = listOf(AncientBrownLight, AncientBrown)) {
             Text("CHRONICLES", style = MaterialTheme.typography.labelLarge,
@@ -83,6 +131,8 @@ fun ProfileScreen(user: User?, taskViewModel: TaskViewModel) {
             ProfileRow("Tasks Completed", "${user?.completedTasksCount ?: 0}")
             ProfileRow("Tasks Active",    "${taskViewModel.tasks.count { !it.isCompleted }}")
             ProfileRow("Overdue",         "${taskViewModel.tasks.count { it.isOverdue }}")
+            ProfileRow("Daily Streak",    "${taskViewModel.currentStreak} days")
+            ProfileRow("Best Streak",     "${taskViewModel.longestStreak} days")
             user?.createdAt?.let { ProfileRow("Member since", it.toDate().toLocaleString()) }
         }
 

@@ -100,6 +100,9 @@ fun DashboardScreen(user: User?, taskViewModel: TaskViewModel) {
             StatCard("Done", "${user?.completedTasksCount ?: 0}", modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.CheckCircle, null, tint = FantasyGold, modifier = Modifier.size(26.dp))
             }
+            StatCard("Streak", "${taskViewModel.currentStreak}", modifier = Modifier.weight(1f)) {
+                Text("🔥", fontSize = 22.sp)
+            }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -130,13 +133,14 @@ fun DashboardScreen(user: User?, taskViewModel: TaskViewModel) {
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier, icon: @Composable () -> Unit) {
     FantasyCard(modifier = modifier, borderColor = FantasyGoldDim, borderWidth = 1.dp,
         gradient = listOf(AncientBrownLight, AncientBrown)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             icon()
-            Column {
-                Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
-                Text(value, style = MaterialTheme.typography.titleLarge,
-                    color = FantasyGold, fontWeight = FontWeight.ExtraBold)
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(value, style = MaterialTheme.typography.titleLarge,
+                color = FantasyGold, fontWeight = FontWeight.ExtraBold,
+                maxLines = 1, softWrap = false)
+            Text(label.uppercase(), style = MaterialTheme.typography.labelSmall,
+                color = ParchmentDim, maxLines = 1, softWrap = false)
         }
     }
 }

@@ -3,10 +3,14 @@ package com.example.progressify
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -19,10 +23,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.progressify.ui.theme.*
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 // ── Złoty divider z opcjonalnym labelem ─────────────────────────
 @Composable
@@ -185,6 +195,128 @@ fun PasswordField(
             }
         }
     )
+}
+
+// ── Streak flame indicator ───────────────────────────────────────
+@Composable
+fun StreakFlameIndicator(streak: Int, modifier: Modifier = Modifier) {
+    val (flameColor, label) = when {
+        streak >= 30 -> Pair(DragonRedLight,  "LEGENDARY")
+        streak >= 7  -> Pair(DragonRedLight,  "BLAZING")
+        streak >= 3  -> Pair(FantasyGold,     "ON FIRE")
+        streak >= 1  -> Pair(FantasyGoldDim,  "WARMING UP")
+        else         -> Pair(IronGray,        "NO STREAK")
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "flame")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue  = if (streak >= 7) 0.7f else 1f,
+        targetValue   = 1f,
+        animationSpec = infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label         = "flamePulse"
+    )
+
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text  = "🔥",
+            fontSize = (28 * pulse).sp,
+            color = flameColor
+        )
+        Text(
+            text  = "$streak",
+            style = MaterialTheme.typography.titleLarge,
+            color = flameColor,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = flameColor.copy(alpha = 0.7f)
+        )
+    }
+}
+
+// ── Kalendarz streak'ów ──────────────────────────────────────────
+@Composable
+fun StreakCalendar(streakDates: Set<String>, modifier: Modifier = Modifier) {
+    var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
+    val today = LocalDate.now()
+    val fmt   = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+    val firstDay    = displayedMonth.atDay(1)
+    val startOffset = firstDay.dayOfWeek.value - 1   // Mon=0 … Sun=6
+    val daysInMonth = displayedMonth.lengthOfMonth()
+    val rows        = (startOffset + daysInMonth + 6) / 7
+
+    Column(modifier = modifier) {
+        // Nawigacja między miesiącami
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { displayedMonth = displayedMonth.minusMonths(1) }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null,
+                    tint = FantasyGold, modifier = Modifier.size(20.dp))
+            }
+            Text(
+                text = "${firstDay.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).uppercase()} ${displayedMonth.year}",
+                style = MaterialTheme.typography.labelMedium,
+                color = FantasyGold, fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = { displayedMonth = displayedMonth.plusMonths(1) }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
+                    tint = FantasyGold, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        // Nagłówki dni tygodnia
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEach { d ->
+                Text(d, modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ParchmentDim.copy(alpha = 0.5f))
+            }
+        }
+
+        // Siatka dni
+        repeat(rows) { row ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                repeat(7) { col ->
+                    val dayNum = row * 7 + col - startOffset + 1
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (dayNum in 1..daysInMonth) {
+                            val date    = displayedMonth.atDay(dayNum)
+                            val dateStr = date.format(fmt)
+                            val active  = dateStr in streakDates
+                            val isToday = date == today
+
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .padding(3.dp)
+                                    .size(32.dp)
+                                    .then(if (active)  Modifier.background(DeepDragonRed.copy(alpha = 0.3f), CircleShape) else Modifier)
+                                    .then(if (isToday) Modifier.border(1.dp, FantasyGold, CircleShape) else Modifier)
+                            ) {
+                                if (active) {
+                                    Text("🔥", fontSize = 16.sp)
+                                } else {
+                                    Text(
+                                        text = "$dayNum",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isToday) Parchment else ParchmentDim.copy(alpha = 0.3f),
+                                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ── Pulsujący wskaźnik ładowania ─────────────────────────────────

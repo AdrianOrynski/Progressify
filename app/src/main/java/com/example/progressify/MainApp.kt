@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,20 +36,22 @@ private sealed class NavItem(val route: String, val title: String, val icon: Ima
     object Profile   : NavItem("profile",   "Hero",     Icons.Default.Person)
 }
 
+private val navItems = listOf(NavItem.Dashboard, NavItem.Tasks, NavItem.Skills, NavItem.Profile)
+
 @Composable
 fun MainApp(user: User?) {
     val navController                = rememberNavController()
     val taskViewModel: TaskViewModel = viewModel()
+    val entry   by navController.currentBackStackEntryAsState()
+    val current = entry?.destination?.route
 
     LaunchedEffect(user) { taskViewModel.syncXpFromUser(user) }
 
     Scaffold(
         containerColor = DarkWood,
         bottomBar = {
-            val entry   by navController.currentBackStackEntryAsState()
-            val current = entry?.destination?.route
             NavigationBar(containerColor = androidx.compose.ui.graphics.Color(0xFF0A0704), tonalElevation = 0.dp) {
-                listOf(NavItem.Dashboard, NavItem.Tasks, NavItem.Skills, NavItem.Profile).forEach { item ->
+                navItems.forEach { item ->
                     NavigationBarItem(
                         icon     = { Icon(item.icon, contentDescription = item.title) },
                         label    = { Text(item.title, fontWeight = FontWeight.Bold,
@@ -74,7 +78,29 @@ fun MainApp(user: User?) {
         NavHost(
             navController    = navController,
             startDestination = NavItem.Dashboard.route,
-            modifier         = Modifier.padding(innerPadding),
+            modifier         = Modifier
+                .padding(innerPadding)
+                .pointerInput(current) {
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val idx = navItems.indexOfFirst { it.route == current }
+                            if (totalDrag < -200 && idx in 0 until navItems.size - 1) {
+                                navController.navigate(navItems[idx + 1].route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true; restoreState = true
+                                }
+                            } else if (totalDrag > 200 && idx > 0) {
+                                navController.navigate(navItems[idx - 1].route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true; restoreState = true
+                                }
+                            }
+                            totalDrag = 0f
+                        },
+                        onDragCancel = { totalDrag = 0f }
+                    ) { _, dragAmount -> totalDrag += dragAmount }
+                },
             enterTransition  = { fadeIn(tween(250)) + slideInHorizontally(tween(250)) { it / 6 } },
             exitTransition   = { fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 6 } }
         ) {

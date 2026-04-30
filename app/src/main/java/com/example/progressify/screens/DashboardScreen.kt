@@ -97,7 +97,7 @@ fun DashboardScreen(user: User?, taskViewModel: TaskViewModel) {
             StatCard("Level", "${taskViewModel.currentLevel}", modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.Star, null, tint = FantasyGold, modifier = Modifier.size(26.dp))
             }
-            StatCard("Done", "${user?.completedTasksCount ?: 0}", modifier = Modifier.weight(1f)) {
+            StatCard("Done", "${taskViewModel.completedTasksCount}", modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.CheckCircle, null, tint = FantasyGold, modifier = Modifier.size(26.dp))
             }
             StatCard("Streak", "${taskViewModel.currentStreak}", modifier = Modifier.weight(1f)) {

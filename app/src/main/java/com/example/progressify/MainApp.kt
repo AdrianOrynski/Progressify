@@ -39,7 +39,7 @@ private sealed class NavItem(val route: String, val title: String, val icon: Ima
 private val navItems = listOf(NavItem.Dashboard, NavItem.Tasks, NavItem.Skills, NavItem.Profile)
 
 @Composable
-fun MainApp(user: User?) {
+fun MainApp(user: User?, onLogout: () -> Unit = {}) {
     val navController                = rememberNavController()
     val taskViewModel: TaskViewModel = viewModel()
     val entry   by navController.currentBackStackEntryAsState()
@@ -107,7 +107,7 @@ fun MainApp(user: User?) {
             composable(NavItem.Dashboard.route) { DashboardScreen(user, taskViewModel) }
             composable(NavItem.Tasks.route)     { TaskListScreen(user, taskViewModel) }
             composable(NavItem.Skills.route)    { SkillsScreen(taskViewModel) }
-            composable(NavItem.Profile.route)   { ProfileScreen(user, taskViewModel) }
+            composable(NavItem.Profile.route)   { ProfileScreen(user, taskViewModel, onLogout) }
         }
     }
 }

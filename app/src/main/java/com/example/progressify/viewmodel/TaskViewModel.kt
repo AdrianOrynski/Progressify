@@ -5,6 +5,7 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
 import com.example.progressify.*
 import com.google.firebase.Timestamp
+import java.time.LocalDate
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -29,6 +30,8 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var longestStreak  by mutableIntStateOf(0)
         private set
+    var completedTasksCount by mutableIntStateOf(0)
+        private set
     var streakDates    by mutableStateOf<Set<String>>(emptySet())
         private set
 
@@ -38,7 +41,7 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
     val xpToNextLevel get() = currentLevel * 1000
 
     init { loadTasks()
-           loadAllCategoryStats() }
+        loadAllCategoryStats() }
 
     // ── Loading Tasks ───────────────────────────────────────────
 
@@ -91,9 +94,10 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
         user?.let {
             currentXp     = it.experiencePoints
             currentLevel  = it.level
-            currentStreak = it.currentStreak
-            longestStreak = it.longestStreak
-            streakDates   = it.streakDates.toSet()
+            currentStreak       = it.currentStreak
+            longestStreak       = it.longestStreak
+            completedTasksCount = it.completedTasksCount
+            streakDates         = it.streakDates.toSet()
         }
     }
 
@@ -148,10 +152,12 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
         taskRepository.completeTask(uid, task.id, task.category) { success, xpFromDb ->
             if (success) {
                 loadTasks()
+                completedTasksCount++
                 triggerXpPopup(xpFromDb)
                 currentXp += xpFromDb
                 while (currentXp >= xpToNextLevel) { currentXp -= xpToNextLevel; currentLevel++ }
                 saveXpToFirestore()
+                updateStreakInFirestore()
 
                 val cat = TaskCategory.entries.firstOrNull { it.label == task.category }
                 if (cat != null) refreshCategoryStat(cat)
@@ -159,7 +165,9 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
                 if (task.isRecurring) {
                     taskRepository.scheduleNextOccurrence(uid, task) { nextTask ->
                         if (nextTask != null) {
-                            loadTasksForCategory(TaskCategory.entries.first { it.label == task.category })
+                            // Full reload so the completed copy stays visible
+                            // alongside the newly created next occurrence
+                            loadTasks()
                             NotificationScheduler.schedule(getApplication(), nextTask)
                         }
                     }
@@ -181,6 +189,31 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
             },
             onFailure = {}
         )
+    }
+
+    private fun updateStreakInFirestore() {
+        if (uid.isBlank()) return
+        val today = java.time.LocalDate.now().toString() // "yyyy-MM-dd"
+        val updatedDates = (streakDates + today).sorted()
+
+        // Calculate current streak: count consecutive days ending today
+        var streak = 0
+        var checkDate = java.time.LocalDate.now()
+        while (updatedDates.contains(checkDate.toString())) {
+            streak++
+            checkDate = checkDate.minusDays(1)
+        }
+        val newLongest = maxOf(longestStreak, streak)
+
+        streakDates   = updatedDates.toSet()
+        currentStreak = streak
+        longestStreak = newLongest
+
+        db.collection("users").document(uid).update(mapOf(
+            "streakDates"    to updatedDates,
+            "currentStreak"  to streak,
+            "longestStreak"  to newLongest
+        ))
     }
 
     private fun saveXpToFirestore() {

@@ -3,6 +3,7 @@ package com.example.progressify
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.Exclude
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.PropertyName
 import java.time.Duration
 import java.time.ZoneId
@@ -85,7 +86,7 @@ data class Task(
         val diff = try { Difficulty.valueOf(difficulty) } catch (e: Exception) { Difficulty.MEDIUM }
         val base = diff.xpBase.toFloat()
         val durationMinutes = getDuration()?.toMinutes()?.toFloat() ?: 0f
-        val scaler = durationMinutes / 60f
+        val scaler = durationMinutes / 30f
         val rawXP = (base * scaler * getTimeDiff(now)).toInt()
         val roundedXp = (Math.round(rawXP / 10.0) * 10).toInt()
         return roundedXp
@@ -112,7 +113,9 @@ data class Task(
         if (!isRecurring) return null
         val startDate = startTime?.toDate() ?: return null
         val endDate = endTime?.toDate()
-        val zoneId = ZoneId.systemDefault()
+        // Always use the device current timezone so recurrence respects wall-clock days
+        // even when the user travels across time zones.
+        val zoneId = ZoneId.of(java.util.TimeZone.getDefault().id)
         val startZdt = startDate.toInstant().atZone(zoneId)
 
         val nextStartZdt: ZonedDateTime = when (recurrence.type) {
@@ -333,7 +336,6 @@ class TaskRepository {
         db.runTransaction { tx ->
             val taskSnap = tx.get(activeRef)
             val catSnap  = tx.get(catRef)
-            val userSnap = tx.get(userRef)
 
             val task  = taskSnap.toObject(Task::class.java) ?: throw Exception("Task not found")
             val stats = catSnap.toObject(CategoryStats::class.java) ?: CategoryStats()
@@ -359,9 +361,8 @@ class TaskRepository {
                 completedTasksCount = stats.completedTasksCount + 1
             ))
 
-            // 3. Update global tasks data
-            val currentCount = userSnap.getLong("completedTasksCount")?.toInt() ?: 0
-            tx.update(userRef, "completedTasksCount", currentCount + 1)
+            // 3. Update global tasks data — use server-side increment (no read needed)
+            tx.update(userRef, "completedTasksCount", FieldValue.increment(1))
 
             calculatedXp
         }

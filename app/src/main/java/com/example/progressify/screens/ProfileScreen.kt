@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +24,7 @@ import com.example.progressify.ui.theme.*
 import com.example.progressify.viewmodel.TaskViewModel
 
 @Composable
-fun ProfileScreen(user: User?, taskViewModel: TaskViewModel) {
+fun ProfileScreen(user: User?, taskViewModel: TaskViewModel, onLogout: () -> Unit = {}) {
     val infiniteTransition = rememberInfiniteTransition(label = "avatarPulse")
     val avatarScale by infiniteTransition.animateFloat(
         initialValue  = 1f, targetValue = 1.05f,
@@ -137,6 +138,21 @@ fun ProfileScreen(user: User?, taskViewModel: TaskViewModel) {
         }
 
         Spacer(Modifier.height(24.dp))
+
+        OutlinedButton(
+            onClick = onLogout,
+            modifier = Modifier.fillMaxWidth(),
+            border = androidx.compose.foundation.BorderStroke(1.dp, DragonRedLight.copy(alpha = 0.6f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DragonRedLight)
+        ) {
+            Icon(Icons.Default.ExitToApp, contentDescription = null,
+                modifier = Modifier.size(18.dp).padding(end = 0.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("LEAVE TAVERN", style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        }
+
+        Spacer(Modifier.height(32.dp))
     }
 }
 

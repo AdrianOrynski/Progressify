@@ -67,6 +67,11 @@ class AuthViewModel : ViewModel() {
 
     fun clearError() { _state.value = _state.value.copy(error = null) }
 
+    fun signOut() {
+        FirebaseAuth.getInstance().signOut()
+        _state.value = AuthUiState()
+    }
+
     private fun mapError(msg: String?) = when {
         msg == null                              -> "Unknown error."
         msg.contains("no user record")           -> "No hero found with this email!"

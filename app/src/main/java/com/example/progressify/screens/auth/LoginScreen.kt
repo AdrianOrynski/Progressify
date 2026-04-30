@@ -132,14 +132,10 @@ fun LoginScreen(navController: NavController, vm: AuthViewModel = viewModel()) {
 
             Row(
                 modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.Center
             ) {
                 TextButton(onClick = { navController.navigate("register") }) {
                     Text(text = "New Hero? Register", color = FantasyGold,
-                        style = MaterialTheme.typography.labelLarge)
-                }
-                TextButton(onClick = { }) {
-                    Text(text = "Forgot password?", color = ParchmentDim,
                         style = MaterialTheme.typography.labelLarge)
                 }
             }

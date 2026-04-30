@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.progressify.screens.auth.LoginScreen
 import com.example.progressify.screens.auth.RegisterScreen
 import com.example.progressify.ui.theme.ProgressifyTheme
+import com.example.progressify.viewmodel.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
@@ -37,7 +38,7 @@ class MainActivity : ComponentActivity() {
         NotificationScheduler.createChannel(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
+            != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -55,19 +56,14 @@ class MainActivity : ComponentActivity() {
                 var errorMessage by remember { mutableStateOf<String?>(null) }
                 val navController = rememberNavController()
 
+                val startDest = if (auth.currentUser != null) "main_app/${auth.currentUser!!.uid}" else "auth_graph"
+
                 LaunchedEffect(Unit) {
                     val currentUser = auth.currentUser
-
-                    if (currentUser == null) {
-                        auth.signInWithEmailAndPassword("adrorynski@gmail.com", "AdminTest")
-                            .addOnSuccessListener { result ->
-                                loadUser(result.user?.uid) { userProfile = it; isLoading = false }
-                            }
-                            .addOnFailureListener {
-                                errorMessage = "Login error"; isLoading = false
-                            }
-                    } else {
+                    if (currentUser != null) {
                         loadUser(currentUser.uid) { userProfile = it; isLoading = false }
+                    } else {
+                        isLoading = false
                     }
                 }
 
@@ -76,7 +72,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     NavHost(
                         navController = navController,
-                        startDestination = "auth_graph",
+                        startDestination = startDest,
                         enterTransition = { fadeIn(tween(400)) },
                         exitTransition = { fadeOut(tween(400)) }
                     ) {
@@ -87,6 +83,7 @@ class MainActivity : ComponentActivity() {
                         composable("main_app/{uid}") { backStackEntry ->
                             val uid = backStackEntry.arguments?.getString("uid") ?: ""
                             var user by remember { mutableStateOf(userProfile) }
+                            val authVm: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
                             LaunchedEffect(uid) {
                                 if (uid.isNotBlank()) {
@@ -94,7 +91,15 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            MainApp(user = user)
+                            MainApp(
+                                user = user,
+                                onLogout = {
+                                    authVm.signOut()
+                                    navController.navigate("login") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            )
                         }
                     }
                 }

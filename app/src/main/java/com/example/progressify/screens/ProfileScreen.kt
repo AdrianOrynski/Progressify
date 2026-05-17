@@ -59,9 +59,21 @@ fun ProfileScreen(user: User?, taskViewModel: TaskViewModel, onLogout: () -> Uni
         if (user?.name?.isNotBlank() == true || user?.surname?.isNotBlank() == true)
             Text("${user.name} ${user.surname}".trim(),
                 style = MaterialTheme.typography.bodyMedium, color = ParchmentDim)
-        Text("CLASS: LEVEL ${taskViewModel.currentLevel} EXPLORER",
-            color = FantasyGold, fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+        val topClasses = taskViewModel.heroClasses
+            .mapNotNull { runCatching { HeroClass.valueOf(it) }.getOrNull() }
+        if (topClasses.isNotEmpty()) {
+            Text(
+                topClasses.joinToString("  ·  ") { "${it.icon} ${it.label.uppercase()}" },
+                color = FantasyGold, fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        } else {
+            Text("⚔️ ADVENTURER",
+                color = FantasyGold, fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 4.dp))
+        }
 
         Spacer(Modifier.height(28.dp))
 

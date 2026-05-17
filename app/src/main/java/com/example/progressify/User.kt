@@ -13,5 +13,8 @@ data class User(
     val completedTasksCount: Int = 0,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
-    val streakDates: List<String> = emptyList()
+    val streakDates: List<String> = emptyList(),
+    val heroClasses: List<String> = emptyList(),
+    val maxXpGained: Int = 0,
+    val longestQuestMinutes: Int = 0
 )

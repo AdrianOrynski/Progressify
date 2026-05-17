@@ -50,8 +50,9 @@ fun SkillsScreen(taskViewModel: TaskViewModel) {
 
 @Composable
 private fun SkillCard(stat: SkillStat) {
-    val color  = skillColor(stat.category)
-    val emoji  = skillIcon(stat.category)
+    val color     = skillColor(stat.category)
+    val emoji     = skillIcon(stat.category)
+    val heroClass = stat.category.toHeroClass()
     val animatedProgress by animateFloatAsState(
         targetValue   = (stat.currentXp.toFloat() / stat.xpToNextLevel).coerceIn(0f, 1f),
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
@@ -91,6 +92,10 @@ private fun SkillCard(stat: SkillStat) {
                 Spacer(Modifier.height(3.dp))
                 Text(skillSubtitle(stat.category),
                     style = MaterialTheme.typography.bodyMedium, color = ParchmentDim)
+                Spacer(Modifier.height(2.dp))
+                Text("${heroClass.icon} ${heroClass.label.uppercase()}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+                    color = color)
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),

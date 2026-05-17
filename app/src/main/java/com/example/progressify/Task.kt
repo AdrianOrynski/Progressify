@@ -29,6 +29,25 @@ enum class TaskCategory(val label: String) {
     BODYFORGE("Bodyforge")
 }
 
+// ── Hero Classes ──────────────────────────────────────────────────
+enum class HeroClass(val label: String, val icon: String) {
+    ARCHMAGE("Archmage", "🔮"),
+    MERCENARY("Mercenary", "⚔️"),
+    BARD("Bard", "🎭"),
+    LOREKEEPER("Lorekeeper", "📖"),
+    PALADIN("Paladin", "🛡️"),
+    BARBARIAN("Barbarian", "🪓")
+}
+
+fun TaskCategory.toHeroClass(): HeroClass = when (this) {
+    TaskCategory.SPELLCRAFT       -> HeroClass.ARCHMAGE
+    TaskCategory.TASKFORGE        -> HeroClass.MERCENARY
+    TaskCategory.BARDS_DELIGHT    -> HeroClass.BARD
+    TaskCategory.SCHOLARS_SANCTUM -> HeroClass.LOREKEEPER
+    TaskCategory.CYCLE_OF_ORDER   -> HeroClass.PALADIN
+    TaskCategory.BODYFORGE        -> HeroClass.BARBARIAN
+}
+
 // ── Repetition type ───────────────────────────────────────────────
 enum class RecurrenceType(val label: String) {
     NONE("None"),

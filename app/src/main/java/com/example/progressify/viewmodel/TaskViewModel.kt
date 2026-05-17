@@ -34,8 +34,14 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var streakDates    by mutableStateOf<Set<String>>(emptySet())
         private set
+    var maxXpGained by mutableIntStateOf(0)
+        private set
+    var longestQuestMinutes by mutableIntStateOf(0)
+        private set
 
     var categoryStats by mutableStateOf<Map<TaskCategory, CategoryStats>>(emptyMap())
+        private set
+    var heroClasses by mutableStateOf<List<String>>(emptyList())
         private set
 
     val xpToNextLevel get() = currentLevel * 1000
@@ -98,6 +104,9 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
             longestStreak       = it.longestStreak
             completedTasksCount = it.completedTasksCount
             streakDates         = it.streakDates.toSet()
+            heroClasses         = it.heroClasses
+            maxXpGained         = it.maxXpGained
+            longestQuestMinutes = it.longestQuestMinutes
         }
     }
 
@@ -159,6 +168,11 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
                 saveXpToFirestore()
                 updateStreakInFirestore()
 
+                if (xpFromDb > maxXpGained) maxXpGained = xpFromDb
+                val durationMin = task.getDuration()?.toMinutes()?.toInt() ?: 0
+                if (durationMin > longestQuestMinutes) longestQuestMinutes = durationMin
+                saveRecordsToFirestore()
+
                 val cat = TaskCategory.entries.firstOrNull { it.label == task.category }
                 if (cat != null) refreshCategoryStat(cat)
 
@@ -186,9 +200,21 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
             category = cat.name,
             onSuccess = { stats ->
                 categoryStats = categoryStats.toMutableMap().also { it[cat] = stats }
+                updateHeroClasses()
             },
             onFailure = {}
         )
+    }
+
+    private fun updateHeroClasses() {
+        val top2 = categoryStats.entries
+            .sortedByDescending { it.value.exp }
+            .take(2)
+            .map { it.key.toHeroClass().name }
+        heroClasses = top2
+        if (uid.isNotBlank()) {
+            db.collection("users").document(uid).update("heroClasses", top2)
+        }
     }
 
     private fun updateStreakInFirestore() {
@@ -220,6 +246,14 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
         if (uid.isBlank()) return
         db.collection("users").document(uid)
             .update(mapOf("experiencePoints" to currentXp, "level" to currentLevel))
+    }
+
+    private fun saveRecordsToFirestore() {
+        if (uid.isBlank()) return
+        db.collection("users").document(uid).update(mapOf(
+            "maxXpGained"         to maxXpGained,
+            "longestQuestMinutes" to longestQuestMinutes
+        ))
     }
 
     // ── SkillStats (categoryStats from Firestore) ────────

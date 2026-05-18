@@ -26,14 +26,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import com.example.progressify.screens.*
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import com.example.progressify.ui.theme.*
 import com.example.progressify.viewmodel.TaskViewModel
 
 private sealed class NavItem(val route: String, val title: String, val icon: ImageVector) {
-    object Dashboard : NavItem("dashboard", "Tavern",   Icons.Default.Home)
-    object Tasks     : NavItem("tasks",     "Bounties", Icons.Default.List)
-    object Skills    : NavItem("skills",    "Skills",   Icons.Default.Star)
-    object Profile   : NavItem("profile",   "Hero",     Icons.Default.Person)
+    object Dashboard   : NavItem("dashboard",   "Tavern",   Icons.Default.Home)
+    object Tasks       : NavItem("tasks",       "Bounties", Icons.Default.List)
+    object Skills      : NavItem("skills",      "Skills",   Icons.Default.Star)
+    object Profile     : NavItem("profile",     "Hero",     Icons.Default.Person)
+}
+
+private object Routes {
+    const val Statistics = "statisticsscreen"
 }
 
 private val navItems = listOf(NavItem.Dashboard, NavItem.Tasks, NavItem.Skills, NavItem.Profile)
@@ -47,30 +53,34 @@ fun MainApp(user: User?, onLogout: () -> Unit = {}) {
 
     LaunchedEffect(user) { taskViewModel.syncXpFromUser(user) }
 
+    val isSubScreen = current == Routes.Statistics
+
     Scaffold(
         containerColor = DarkWood,
         bottomBar = {
-            NavigationBar(containerColor = androidx.compose.ui.graphics.Color(0xFF0A0704), tonalElevation = 0.dp) {
-                navItems.forEach { item ->
-                    NavigationBarItem(
-                        icon     = { Icon(item.icon, contentDescription = item.title) },
-                        label    = { Text(item.title, fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelSmall) },
-                        selected = current == item.route,
-                        colors   = NavigationBarItemDefaults.colors(
-                            selectedIconColor   = FantasyGold,
-                            selectedTextColor   = FantasyGold,
-                            unselectedIconColor = ParchmentDim.copy(alpha = 0.5f),
-                            unselectedTextColor = ParchmentDim.copy(alpha = 0.5f),
-                            indicatorColor      = DeepDragonRed.copy(alpha = 0.35f)
-                        ),
-                        onClick = {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true; restoreState = true
+            if (!isSubScreen) {
+                NavigationBar(containerColor = androidx.compose.ui.graphics.Color(0xFF0A0704), tonalElevation = 0.dp) {
+                    navItems.forEach { item ->
+                        NavigationBarItem(
+                            icon     = { Icon(item.icon, contentDescription = item.title) },
+                            label    = { Text(item.title, fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelSmall) },
+                            selected = current == item.route,
+                            colors   = NavigationBarItemDefaults.colors(
+                                selectedIconColor   = FantasyGold,
+                                selectedTextColor   = FantasyGold,
+                                unselectedIconColor = ParchmentDim.copy(alpha = 0.5f),
+                                unselectedTextColor = ParchmentDim.copy(alpha = 0.5f),
+                                indicatorColor      = DeepDragonRed.copy(alpha = 0.35f)
+                            ),
+                            onClick = {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true; restoreState = true
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -81,6 +91,7 @@ fun MainApp(user: User?, onLogout: () -> Unit = {}) {
             modifier         = Modifier
                 .padding(innerPadding)
                 .pointerInput(current) {
+                    if (isSubScreen) return@pointerInput
                     var totalDrag = 0f
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -107,7 +118,24 @@ fun MainApp(user: User?, onLogout: () -> Unit = {}) {
             composable(NavItem.Dashboard.route) { DashboardScreen(user, taskViewModel) }
             composable(NavItem.Tasks.route)     { TaskListScreen(user, taskViewModel) }
             composable(NavItem.Skills.route)    { SkillsScreen(taskViewModel) }
-            composable(NavItem.Profile.route)   { ProfileScreen(user, taskViewModel, onLogout) }
+            composable(NavItem.Profile.route) {
+                ProfileScreen(
+                    user              = user,
+                    taskViewModel     = taskViewModel,
+                    onLogout          = onLogout,
+                    onNavigateToStats = { navController.navigate(Routes.Statistics) }
+                )
+            }
+            composable(
+                route           = Routes.Statistics,
+                enterTransition = { slideInVertically(tween(300)) { it } },
+                exitTransition  = { slideOutVertically(tween(300)) { it } }
+            ) {
+                StatisticsScreen(
+                    taskViewModel = taskViewModel,
+                    onBack        = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

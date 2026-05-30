@@ -43,6 +43,8 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var heroClasses by mutableStateOf<List<String>>(emptyList())
         private set
+    var skillPoints by mutableIntStateOf(0)
+        private set
 
     val xpToNextLevel get() = currentLevel * 1000
 
@@ -107,32 +109,38 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
             heroClasses         = it.heroClasses
             maxXpGained         = it.maxXpGained
             longestQuestMinutes = it.longestQuestMinutes
+            skillPoints         = it.skillPoints
         }
     }
 
     // ── Add Task ─────────────────────────────────────────
 
     fun addTask(
-        title: String,
-        description: String,
-        category: String,
-        difficulty: String,
-        startTime: Timestamp,
-        endTime: Timestamp,
-        recurrence: RecurrenceRule
+        title         : String,
+        description   : String,
+        category      : String,
+        difficulty    : String,
+        startTime     : Timestamp,
+        endTime       : Timestamp,
+        recurrence    : RecurrenceRule,
+        heroSkillUsed : String? = null,
+        bonusCategory : String? = null
     ) {
         val task = Task(
-            uid         = uid,
-            title       = title,
-            description = description,
-            category    = category,
-            difficulty  = difficulty,
-            startTime   = startTime,
-            endTime     = endTime,
-            recurrence  = recurrence
+            uid           = uid,
+            title         = title,
+            description   = description,
+            category      = category,
+            difficulty    = difficulty,
+            startTime     = startTime,
+            endTime       = endTime,
+            recurrence    = recurrence,
+            heroSkillUsed = heroSkillUsed,
+            bonusCategory = bonusCategory
         )
         taskRepository.addTask(task) { createdTask ->
             if (createdTask != null) {
+                if (heroSkillUsed != null) spendSkillPoint()
                 loadTasks()
                 NotificationScheduler.schedule(getApplication(), createdTask)
             } else {
@@ -158,6 +166,13 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
 
         NotificationScheduler.cancel(getApplication(), task)
 
+        val cat          = TaskCategory.entries.firstOrNull { it.label == task.category }
+        val oldCatLevel  = cat?.let { categoryStats[it]?.level } ?: 1
+        val bonusCat     = if (task.heroSkillUsed == HeroClass.ARCHMAGE.name) {
+            task.bonusCategory?.let { name -> TaskCategory.entries.firstOrNull { it.name == name } }
+        } else null
+        val oldBonusLevel = bonusCat?.let { categoryStats[it]?.level } ?: 1
+
         taskRepository.completeTask(uid, task.id, task.category) { success, xpFromDb ->
             if (success) {
                 loadTasks()
@@ -173,14 +188,12 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
                 if (durationMin > longestQuestMinutes) longestQuestMinutes = durationMin
                 saveRecordsToFirestore()
 
-                val cat = TaskCategory.entries.firstOrNull { it.label == task.category }
-                if (cat != null) refreshCategoryStat(cat)
+                if (cat != null) refreshCategoryStat(cat, oldCatLevel)
+                if (bonusCat != null) refreshCategoryStat(bonusCat, oldBonusLevel)
 
                 if (task.isRecurring) {
                     taskRepository.scheduleNextOccurrence(uid, task) { nextTask ->
                         if (nextTask != null) {
-                            // Full reload so the completed copy stays visible
-                            // alongside the newly created next occurrence
                             loadTasks()
                             NotificationScheduler.schedule(getApplication(), nextTask)
                         }
@@ -194,16 +207,59 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Private Helpers ──────────────────────────────────────────
 
-    private fun refreshCategoryStat(cat: TaskCategory) {
+    private fun refreshCategoryStat(cat: TaskCategory, oldLevel: Int = -1) {
         taskRepository.getCategoryStats(
             uid      = uid,
             category = cat.name,
             onSuccess = { stats ->
                 categoryStats = categoryStats.toMutableMap().also { it[cat] = stats }
                 updateHeroClasses()
+                if (oldLevel >= 0) {
+                    val pointsEarned = (stats.level / 5) - (oldLevel / 5)
+                    if (pointsEarned > 0) awardSkillPoints(pointsEarned)
+                }
             },
             onFailure = {}
         )
+    }
+
+    private fun awardSkillPoints(count: Int) {
+        skillPoints += count
+        if (uid.isNotBlank()) {
+            db.collection("users").document(uid)
+                .update("skillPoints", com.google.firebase.firestore.FieldValue.increment(count.toLong()))
+        }
+    }
+
+    private fun spendSkillPoint() {
+        if (skillPoints <= 0) return
+        skillPoints--
+        if (uid.isNotBlank()) {
+            db.collection("users").document(uid)
+                .update("skillPoints", com.google.firebase.firestore.FieldValue.increment(-1L))
+        }
+    }
+
+    fun freezeStreakToday() {
+        if (uid.isBlank() || skillPoints <= 0) return
+        val today        = java.time.LocalDate.now().toString()
+        val updatedDates = (streakDates + today).distinct().sorted()
+
+        var streak    = 0
+        var checkDate = java.time.LocalDate.now()
+        while (updatedDates.contains(checkDate.toString())) { streak++; checkDate = checkDate.minusDays(1) }
+        val newLongest = maxOf(longestStreak, streak)
+
+        streakDates   = updatedDates.toSet()
+        currentStreak = streak
+        longestStreak = newLongest
+        spendSkillPoint()
+
+        db.collection("users").document(uid).update(mapOf(
+            "streakDates"   to updatedDates,
+            "currentStreak" to streak,
+            "longestStreak" to newLongest
+        ))
     }
 
     private fun updateHeroClasses() {

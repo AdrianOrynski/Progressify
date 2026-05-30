@@ -147,9 +147,11 @@ fun TaskListScreen(user: User?, taskViewModel: TaskViewModel) {
 
     if (showAddDialog) {
         AddTaskDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { title, desc, category, difficulty, startTime, endTime, recurrence ->
-                taskViewModel.addTask(title, desc, category, difficulty, startTime, endTime, recurrence)
+            skillPoints  = taskViewModel.skillPoints,
+            heroClasses  = taskViewModel.heroClasses,
+            onDismiss    = { showAddDialog = false },
+            onConfirm    = { title, desc, category, difficulty, startTime, endTime, recurrence, heroSkillUsed, bonusCategory ->
+                taskViewModel.addTask(title, desc, category, difficulty, startTime, endTime, recurrence, heroSkillUsed, bonusCategory)
                 showAddDialog = false
             }
         )

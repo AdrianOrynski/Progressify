@@ -80,9 +80,11 @@ data class Task(
     @PropertyName("isCompleted")
     val isCompleted : Boolean        = false,
 
-    val completedAt : Timestamp?     = null,
-    val xpAwarded   : Int            = 0,
-    val recurrence  : RecurrenceRule = RecurrenceRule()
+    val completedAt   : Timestamp?     = null,
+    val xpAwarded     : Int            = 0,
+    val recurrence    : RecurrenceRule = RecurrenceRule(),
+    val heroSkillUsed : String?        = null,
+    val bonusCategory : String?        = null
 ) {
     @get:Exclude
     val isOverdue: Boolean
@@ -100,6 +102,17 @@ data class Task(
     @get:Exclude
     val isRecurring: Boolean
         get() = recurrence.type != RecurrenceType.NONE.name
+
+    @get:Exclude
+    val skillXpMultiplier: Float
+        get() = when (heroSkillUsed) {
+            HeroClass.BARBARIAN.name  -> 2f
+            HeroClass.BARD.name       -> 2f
+            HeroClass.ARCHMAGE.name   -> 2f
+            HeroClass.LOREKEEPER.name -> 1.5f
+            HeroClass.MERCENARY.name  -> if (isOverdue) 0f else 3f
+            else                      -> 1f
+        }
 
     fun calculateXp(now: Timestamp = Timestamp.now()): Int {
         val diff = try { Difficulty.valueOf(difficulty) } catch (e: Exception) { Difficulty.MEDIUM }
@@ -360,7 +373,7 @@ class TaskRepository {
             val stats = catSnap.toObject(CategoryStats::class.java) ?: CategoryStats()
 
             val now          = Timestamp.now()
-            val calculatedXp = task.calculateXp(now)
+            val calculatedXp = (task.calculateXp(now) * task.skillXpMultiplier).toInt()
             val completedTask = task.copy(
                 isCompleted = true,
                 completedAt = now,
@@ -380,7 +393,20 @@ class TaskRepository {
                 completedTasksCount = stats.completedTasksCount + 1
             ))
 
-            // 3. Update global tasks data — use server-side increment (no read needed)
+            // 3. Archmage: add XP to bonus category as well
+            val bonusCatKey = task.bonusCategory
+            if (bonusCatKey != null && task.heroSkillUsed == HeroClass.ARCHMAGE.name) {
+                val bonusCatRef  = categoryDoc(uid, bonusCatKey)
+                val bonusCatSnap = tx.get(bonusCatRef)
+                val bonusStats   = bonusCatSnap.toObject(CategoryStats::class.java) ?: CategoryStats()
+                val bonusNewExp  = bonusStats.exp + calculatedXp
+                tx.set(bonusCatRef, bonusStats.copy(
+                    exp   = bonusNewExp,
+                    level = computeLevel(bonusNewExp)
+                ))
+            }
+
+            // 4. Update global tasks data — use server-side increment (no read needed)
             tx.update(userRef, "completedTasksCount", FieldValue.increment(1))
 
             calculatedXp

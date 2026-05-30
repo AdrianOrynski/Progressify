@@ -151,6 +151,7 @@ fun ProfileScreen(
             ProfileRow("Overdue",         "${taskViewModel.tasks.count { it.isOverdue }}")
             ProfileRow("Daily Streak",    "${taskViewModel.currentStreak} days")
             ProfileRow("Best Streak",     "${taskViewModel.longestStreak} days")
+            ProfileRow("Skill Points",    "${taskViewModel.skillPoints} pts")
             user?.createdAt?.let { ProfileRow("Member since", it.toDate().toLocaleString()) }
         }
 

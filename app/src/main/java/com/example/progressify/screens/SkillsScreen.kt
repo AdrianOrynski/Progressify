@@ -29,6 +29,9 @@ import com.example.progressify.viewmodel.TaskViewModel
 
 @Composable
 fun SkillsScreen(taskViewModel: TaskViewModel) {
+    var pendingSkill by remember { mutableStateOf<HeroClass?>(null) }
+    val today = java.time.LocalDate.now().toString()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -36,25 +39,74 @@ fun SkillsScreen(taskViewModel: TaskViewModel) {
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Text("⚗️ SKILL GRIMOIRE",
-            style    = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = FantasyGold),
-            modifier = Modifier.padding(bottom = 6.dp, top = 16.dp))
+        Row(
+            modifier              = Modifier.padding(bottom = 6.dp, top = 16.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Text("⚗️ SKILL GRIMOIRE",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = FantasyGold))
+            Box(
+                modifier = Modifier
+                    .background(FantasyGold.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                    .border(1.dp, FantasyGold.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text("✦ ${taskViewModel.skillPoints} SP",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = FantasyGold, fontWeight = FontWeight.ExtraBold)
+            }
+        }
         Text("Tap a discipline to reveal your hero class",
             style    = MaterialTheme.typography.bodyMedium, color = ParchmentDim,
             modifier = Modifier.padding(bottom = 24.dp))
 
         taskViewModel.skillStats.forEach { stat ->
-            SkillCard(stat, activeClasses = taskViewModel.heroClasses)
+            val heroClass   = stat.category.toHeroClass()
+            val canActivate = heroClass.name in taskViewModel.heroClasses &&
+                taskViewModel.skillPoints > 0 &&
+                (heroClass != HeroClass.PALADIN || today !in taskViewModel.streakDates)
+            SkillCard(
+                stat          = stat,
+                activeClasses = taskViewModel.heroClasses,
+                skillPoints   = taskViewModel.skillPoints,
+                canActivate   = canActivate,
+                onActivate    = { hc ->
+                    if (hc == HeroClass.PALADIN) taskViewModel.freezeStreakToday()
+                    else pendingSkill = hc
+                }
+            )
             Spacer(Modifier.height(12.dp))
         }
 
         Spacer(Modifier.height(16.dp))
     }
+
+    pendingSkill?.let { skill ->
+        val prefilledCat = TaskCategory.entries.firstOrNull { it.toHeroClass() == skill }
+        AddTaskDialog(
+            skillPoints       = taskViewModel.skillPoints,
+            heroClasses       = taskViewModel.heroClasses,
+            initialCategory   = prefilledCat?.label ?: "",
+            initialSkillClass = skill,
+            onDismiss         = { pendingSkill = null },
+            onConfirm         = { title, desc, cat, diff, start, end, rec, heroSkill, bonusCat ->
+                taskViewModel.addTask(title, desc, cat, diff, start, end, rec, heroSkill, bonusCat)
+                pendingSkill = null
+            }
+        )
+    }
 }
 
 @Composable
-private fun SkillCard(stat: SkillStat, activeClasses: List<String>) {
+private fun SkillCard(
+    stat          : SkillStat,
+    activeClasses : List<String>,
+    skillPoints   : Int,
+    canActivate   : Boolean,
+    onActivate    : (HeroClass) -> Unit
+) {
     val color     = skillColor(stat.category)
     val emoji     = skillIcon(stat.category)
     val heroClass = stat.category.toHeroClass()
@@ -167,7 +219,7 @@ private fun SkillCard(stat: SkillStat, activeClasses: List<String>) {
                     enter   = expandVertically(tween(280)),
                     exit    = shrinkVertically(tween(220))
                 ) {
-                    ClassPanel(heroClass = heroClass, color = color, isActive = isActive)
+                    ClassPanel(heroClass = heroClass, color = color, isActive = isActive, canActivate = canActivate, onActivate = onActivate)
                 }
             }
         }
@@ -175,7 +227,13 @@ private fun SkillCard(stat: SkillStat, activeClasses: List<String>) {
 }
 
 @Composable
-private fun ClassPanel(heroClass: HeroClass, color: Color, isActive: Boolean) {
+private fun ClassPanel(
+    heroClass  : HeroClass,
+    color      : Color,
+    isActive   : Boolean,
+    canActivate: Boolean,
+    onActivate : (HeroClass) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -238,6 +296,31 @@ private fun ClassPanel(heroClass: HeroClass, color: Color, isActive: Boolean) {
                 color = color.copy(alpha = if (isActive) 1f else 0.6f)
             )
         }
+
+        Spacer(Modifier.height(10.dp))
+        if (isActive) {
+            Button(
+                onClick  = { onActivate(heroClass) },
+                enabled  = canActivate,
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(4.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor         = color.copy(alpha = 0.25f),
+                    contentColor           = color,
+                    disabledContainerColor = ParchmentDim.copy(alpha = 0.08f),
+                    disabledContentColor   = ParchmentDim.copy(alpha = 0.35f)
+                )
+            ) {
+                Text(
+                    if (canActivate) "⚡ ACTIVATE SKILL" else "NO SKILL POINTS",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold)
+                )
+            }
+        } else {
+            Text("Become one of your top 2 categories to unlock this skill",
+                style = MaterialTheme.typography.labelSmall,
+                color = ParchmentDim.copy(alpha = 0.45f))
+        }
     }
 }
 
@@ -251,12 +334,12 @@ private fun classDescription(heroClass: HeroClass): String = when (heroClass) {
 }
 
 private fun classBonus(heroClass: HeroClass): String = when (heroClass) {
-    HeroClass.ARCHMAGE   -> "Spellcraft XP bonus — creative tasks yield greater rewards"
-    HeroClass.MERCENARY  -> "Taskforge XP bonus — execution tasks yield greater rewards"
-    HeroClass.BARD       -> "Bard's Delight XP bonus — creative leisure yields greater rewards"
-    HeroClass.LOREKEEPER -> "Scholars' Sanctum XP bonus — learning yields greater rewards"
-    HeroClass.PALADIN    -> "Cycle of Order XP bonus — routine tasks yield greater rewards"
-    HeroClass.BARBARIAN  -> "Bodyforge XP bonus — fitness tasks yield greater rewards"
+    HeroClass.ARCHMAGE   -> "MEDIUM task — 2× XP, also grants XP to a bonus category of your choice"
+    HeroClass.MERCENARY  -> "Complete before deadline — 3× XP reward, or 0 XP if you fail"
+    HeroClass.BARD       -> "EASY task — 2× XP on completion"
+    HeroClass.LOREKEEPER -> "Any task — 1.5× XP on completion"
+    HeroClass.PALADIN    -> "Freeze your streak for today — protects it even if you complete no tasks"
+    HeroClass.BARBARIAN  -> "HARD task — 2× XP on completion"
 }
 
 internal fun skillColor(category: TaskCategory): Color = when (category) {

@@ -28,13 +28,24 @@ import java.util.*
 
 @Composable
 fun AddTaskDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String, String, Timestamp, Timestamp, RecurrenceRule) -> Unit
+    skillPoints       : Int,
+    heroClasses       : List<String>,
+    initialCategory   : String    = "",
+    initialSkillClass : HeroClass? = null,
+    onDismiss         : () -> Unit,
+    onConfirm         : (String, String, String, String, Timestamp, Timestamp, RecurrenceRule, String?, String?) -> Unit
 ) {
     var title        by remember { mutableStateOf("") }
     var desc         by remember { mutableStateOf("") }
-    var selectedCat  by remember { mutableStateOf("") }
-    var selectedDiff by remember { mutableStateOf(Difficulty.MEDIUM.name) }
+    var selectedCat  by remember { mutableStateOf(initialCategory) }
+    var selectedDiff by remember {
+        mutableStateOf(when (initialSkillClass) {
+            HeroClass.BARBARIAN -> Difficulty.HARD.name
+            HeroClass.BARD      -> Difficulty.EASY.name
+            HeroClass.ARCHMAGE  -> Difficulty.MEDIUM.name
+            else                -> Difficulty.MEDIUM.name
+        })
+    }
 
     var startDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     var startHour   by remember { mutableStateOf<Int?>(null) }
@@ -46,9 +57,11 @@ fun AddTaskDialog(
     var titleError by remember { mutableStateOf(false) }
     var timeError  by remember { mutableStateOf(false) }
 
-    var recurrenceType by remember { mutableStateOf(RecurrenceType.NONE.name) }
-    var selectedDays   by remember { mutableStateOf(setOf<Int>()) }
-    var interval       by remember { mutableIntStateOf(1) }
+    var recurrenceType   by remember { mutableStateOf(RecurrenceType.NONE.name) }
+    var selectedDays     by remember { mutableStateOf(setOf<Int>()) }
+    var interval         by remember { mutableIntStateOf(1) }
+    var skillEnabled     by remember { mutableStateOf(initialSkillClass != null) }
+    var selectedBonusCat by remember { mutableStateOf("") }
 
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
@@ -69,6 +82,16 @@ fun AddTaskDialog(
         if (date == null) return "Date"
         val cal = Calendar.getInstance().apply { set(date.first, date.second, date.third) }
         return dateFmt.format(cal.time)
+    }
+
+    val activeCat            = TaskCategory.entries.firstOrNull { it.label == selectedCat }
+    val availableSkillClass  = activeCat?.toHeroClass()
+        ?.takeIf { it.name in heroClasses && it != HeroClass.PALADIN }
+    val skillRequiredDiff: String? = when (availableSkillClass) {
+        HeroClass.BARBARIAN -> Difficulty.HARD.name
+        HeroClass.BARD      -> Difficulty.EASY.name
+        HeroClass.ARCHMAGE  -> Difficulty.MEDIUM.name
+        else                -> null
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -117,7 +140,10 @@ fun AddTaskDialog(
                                 CategorySelectChip(
                                     label      = cat.label,
                                     isSelected = selectedCat == cat.label,
-                                    onClick    = { selectedCat = if (selectedCat == cat.label) "" else cat.label },
+                                    onClick    = {
+                                selectedCat = if (selectedCat == cat.label) "" else cat.label
+                                skillEnabled = false; selectedBonusCat = ""
+                            },
                                     modifier   = Modifier.weight(1f)
                                 )
                             }
@@ -150,6 +176,78 @@ fun AddTaskDialog(
                                 style      = MaterialTheme.typography.labelMedium,
                                 color      = if (isSelected) difficultyColor(diff.name) else ParchmentDim,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+                }
+
+                if (availableSkillClass != null && skillPoints > 0) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("HERO SKILL", style = MaterialTheme.typography.labelMedium, color = ParchmentDim)
+                    Spacer(Modifier.height(8.dp))
+                    val sColor = skillColor(activeCat!!)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(sColor.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .border(1.dp, sColor.copy(alpha = if (skillEnabled) 0.7f else 0.3f), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("${availableSkillClass.icon} ${availableSkillClass.label.uppercase()} SKILL",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                                        color = sColor)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(heroSkillDescription(availableSkillClass),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ParchmentDim)
+                                    if (skillRequiredDiff != null && !skillEnabled)
+                                        Text("Requires ${skillRequiredDiff.lowercase()} difficulty",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = FantasyGold.copy(alpha = 0.7f))
+                                }
+                                Switch(
+                                    checked = skillEnabled,
+                                    onCheckedChange = { on ->
+                                        skillEnabled = on
+                                        if (!on) selectedBonusCat = ""
+                                        if (on && skillRequiredDiff != null) selectedDiff = skillRequiredDiff
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor   = sColor,
+                                        checkedTrackColor   = sColor.copy(alpha = 0.3f),
+                                        uncheckedThumbColor = ParchmentDim,
+                                        uncheckedTrackColor = ParchmentDim.copy(alpha = 0.2f)
+                                    )
+                                )
+                            }
+                            if (skillEnabled && availableSkillClass == HeroClass.ARCHMAGE) {
+                                Spacer(Modifier.height(10.dp))
+                                HorizontalDivider(color = sColor.copy(alpha = 0.3f))
+                                Spacer(Modifier.height(10.dp))
+                                Text("BONUS CATEGORY", style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
+                                Spacer(Modifier.height(6.dp))
+                                val bonusCats = TaskCategory.entries.filter { it.label != selectedCat }
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf(bonusCats.take(3), bonusCats.drop(3)).forEach { row ->
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            row.forEach { bc ->
+                                                CategorySelectChip(
+                                                    label      = bc.label,
+                                                    isSelected = selectedBonusCat == bc.name,
+                                                    onClick    = { selectedBonusCat = if (selectedBonusCat == bc.name) "" else bc.name },
+                                                    modifier   = Modifier.weight(1f)
+                                                )
+                                            }
+                                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -272,14 +370,17 @@ fun AddTaskDialog(
                             titleError  = title.isBlank()
                             timeError   = startTs == null || endTs == null
                             if (!titleError && !timeError) {
+                                val effectiveDiff = if (skillEnabled && skillRequiredDiff != null) skillRequiredDiff else selectedDiff
                                 onConfirm(
-                                    title, desc, selectedCat, selectedDiff,
+                                    title, desc, selectedCat, effectiveDiff,
                                     startTs!!, endTs!!,
                                     RecurrenceRule(
                                         type         = recurrenceType,
                                         selectedDays = selectedDays.toList().sorted(),
                                         interval     = interval
-                                    )
+                                    ),
+                                    if (skillEnabled) availableSkillClass?.name else null,
+                                    if (skillEnabled && availableSkillClass == HeroClass.ARCHMAGE) selectedBonusCat.ifBlank { null } else null
                                 )
                             }
                         },
@@ -316,6 +417,15 @@ fun AddTaskDialog(
             onConfirm = { h, min -> endHour = h; endMinute = min; timeError = false; showEndTimePicker = false }
         )
     }
+}
+
+private fun heroSkillDescription(heroClass: HeroClass): String = when (heroClass) {
+    HeroClass.BARBARIAN  -> "HARD task — 2× XP on completion"
+    HeroClass.BARD       -> "EASY task — 2× XP on completion"
+    HeroClass.ARCHMAGE   -> "MEDIUM task — 2× XP, also grants XP to a bonus category"
+    HeroClass.LOREKEEPER -> "Any task — 1.5× XP on completion"
+    HeroClass.MERCENARY  -> "Complete before deadline — 3× XP, or 0 XP if late"
+    HeroClass.PALADIN    -> ""
 }
 
 @Composable

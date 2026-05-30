@@ -50,6 +50,7 @@ fun MainApp(user: User?, onLogout: () -> Unit = {}) {
     val taskViewModel: TaskViewModel = viewModel()
     val entry   by navController.currentBackStackEntryAsState()
     val current = entry?.destination?.route
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(user) { taskViewModel.syncXpFromUser(user) }
 
@@ -57,6 +58,17 @@ fun MainApp(user: User?, onLogout: () -> Unit = {}) {
 
     Scaffold(
         containerColor = DarkWood,
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData   = data,
+                    containerColor = AncientBrownLight,
+                    contentColor   = Parchment,
+                    actionColor    = FantasyGold,
+                    shape          = RoundedCornerShape(8.dp)
+                )
+            }
+        },
         bottomBar = {
             if (!isSubScreen) {
                 NavigationBar(containerColor = androidx.compose.ui.graphics.Color(0xFF0A0704), tonalElevation = 0.dp) {
@@ -85,56 +97,58 @@ fun MainApp(user: User?, onLogout: () -> Unit = {}) {
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController    = navController,
-            startDestination = NavItem.Dashboard.route,
-            modifier         = Modifier
-                .padding(innerPadding)
-                .pointerInput(current) {
-                    if (isSubScreen) return@pointerInput
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            val idx = navItems.indexOfFirst { it.route == current }
-                            if (totalDrag < -200 && idx in 0 until navItems.size - 1) {
-                                navController.navigate(navItems[idx + 1].route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true; restoreState = true
+        CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
+            NavHost(
+                navController    = navController,
+                startDestination = NavItem.Dashboard.route,
+                modifier         = Modifier
+                    .padding(innerPadding)
+                    .pointerInput(current) {
+                        if (isSubScreen) return@pointerInput
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val idx = navItems.indexOfFirst { it.route == current }
+                                if (totalDrag < -200 && idx in 0 until navItems.size - 1) {
+                                    navController.navigate(navItems[idx + 1].route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true; restoreState = true
+                                    }
+                                } else if (totalDrag > 200 && idx > 0) {
+                                    navController.navigate(navItems[idx - 1].route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true; restoreState = true
+                                    }
                                 }
-                            } else if (totalDrag > 200 && idx > 0) {
-                                navController.navigate(navItems[idx - 1].route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true; restoreState = true
-                                }
-                            }
-                            totalDrag = 0f
-                        },
-                        onDragCancel = { totalDrag = 0f }
-                    ) { _, dragAmount -> totalDrag += dragAmount }
-                },
-            enterTransition  = { fadeIn(tween(250)) + slideInHorizontally(tween(250)) { it / 6 } },
-            exitTransition   = { fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 6 } }
-        ) {
-            composable(NavItem.Dashboard.route) { DashboardScreen(user, taskViewModel) }
-            composable(NavItem.Tasks.route)     { TaskListScreen(user, taskViewModel) }
-            composable(NavItem.Skills.route)    { SkillsScreen(taskViewModel) }
-            composable(NavItem.Profile.route) {
-                ProfileScreen(
-                    user              = user,
-                    taskViewModel     = taskViewModel,
-                    onLogout          = onLogout,
-                    onNavigateToStats = { navController.navigate(Routes.Statistics) }
-                )
-            }
-            composable(
-                route           = Routes.Statistics,
-                enterTransition = { slideInVertically(tween(300)) { it } },
-                exitTransition  = { slideOutVertically(tween(300)) { it } }
+                                totalDrag = 0f
+                            },
+                            onDragCancel = { totalDrag = 0f }
+                        ) { _, dragAmount -> totalDrag += dragAmount }
+                    },
+                enterTransition  = { fadeIn(tween(250)) + slideInHorizontally(tween(250)) { it / 6 } },
+                exitTransition   = { fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 6 } }
             ) {
-                StatisticsScreen(
-                    taskViewModel = taskViewModel,
-                    onBack        = { navController.popBackStack() }
-                )
+                composable(NavItem.Dashboard.route) { DashboardScreen(user, taskViewModel) }
+                composable(NavItem.Tasks.route)     { TaskListScreen(user, taskViewModel) }
+                composable(NavItem.Skills.route)    { SkillsScreen(taskViewModel) }
+                composable(NavItem.Profile.route) {
+                    ProfileScreen(
+                        user              = user,
+                        taskViewModel     = taskViewModel,
+                        onLogout          = onLogout,
+                        onNavigateToStats = { navController.navigate(Routes.Statistics) }
+                    )
+                }
+                composable(
+                    route           = Routes.Statistics,
+                    enterTransition = { slideInVertically(tween(300)) { it } },
+                    exitTransition  = { slideOutVertically(tween(300)) { it } }
+                ) {
+                    StatisticsScreen(
+                        taskViewModel = taskViewModel,
+                        onBack        = { navController.popBackStack() }
+                    )
+                }
             }
         }
     }

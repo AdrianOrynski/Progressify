@@ -3,7 +3,9 @@ package com.example.progressify.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,11 +28,26 @@ import com.example.progressify.*
 import com.example.progressify.ui.theme.*
 import com.example.progressify.viewmodel.SkillStat
 import com.example.progressify.viewmodel.TaskViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun SkillsScreen(taskViewModel: TaskViewModel) {
     var pendingSkill by remember { mutableStateOf<HeroClass?>(null) }
     val today = java.time.LocalDate.now().toString()
+    val snackbarState = LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
+
+    if (taskViewModel.isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(DarkWood, ShadowBlack.copy(alpha = 0.6f), DarkWood))),
+            contentAlignment = Alignment.Center
+        ) {
+            FantasyLoadingIndicator()
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -62,19 +79,24 @@ fun SkillsScreen(taskViewModel: TaskViewModel) {
             style    = MaterialTheme.typography.bodyMedium, color = ParchmentDim,
             modifier = Modifier.padding(bottom = 24.dp))
 
-        taskViewModel.skillStats.forEach { stat ->
+        taskViewModel.skillStats.forEachIndexed { index, stat ->
             val heroClass   = stat.category.toHeroClass()
             val canActivate = heroClass.name in taskViewModel.heroClasses &&
                 taskViewModel.skillPoints > 0 &&
                 (heroClass != HeroClass.PALADIN || today !in taskViewModel.streakDates)
             SkillCard(
                 stat          = stat,
+                index         = index,
                 activeClasses = taskViewModel.heroClasses,
                 skillPoints   = taskViewModel.skillPoints,
                 canActivate   = canActivate,
                 onActivate    = { hc ->
-                    if (hc == HeroClass.PALADIN) taskViewModel.freezeStreakToday()
-                    else pendingSkill = hc
+                    if (hc == HeroClass.PALADIN) {
+                        taskViewModel.freezeStreakToday()
+                        scope.launch { snackbarState.showSnackbar("🛡️ Streak protected for today!") }
+                    } else {
+                        pendingSkill = hc
+                    }
                 }
             )
             Spacer(Modifier.height(12.dp))
@@ -94,6 +116,7 @@ fun SkillsScreen(taskViewModel: TaskViewModel) {
             onConfirm         = { title, desc, cat, diff, start, end, rec, heroSkill, bonusCat ->
                 taskViewModel.addTask(title, desc, cat, diff, start, end, rec, heroSkill, bonusCat)
                 pendingSkill = null
+                scope.launch { snackbarState.showSnackbar("⚡ Skill activated! Bounty posted.") }
             }
         )
     }
@@ -102,6 +125,7 @@ fun SkillsScreen(taskViewModel: TaskViewModel) {
 @Composable
 private fun SkillCard(
     stat          : SkillStat,
+    index         : Int,
     activeClasses : List<String>,
     skillPoints   : Int,
     canActivate   : Boolean,
@@ -113,6 +137,13 @@ private fun SkillCard(
     val isActive  = heroClass.name in activeClasses
 
     var expanded by remember { mutableStateOf(false) }
+
+    // ── Staggered wejście karty ──────────────────────────────────
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 80L)
+        visible = true
+    }
 
     val animatedProgress by animateFloatAsState(
         targetValue   = (stat.currentXp.toFloat() / stat.xpToNextLevel).coerceIn(0f, 1f),
@@ -128,98 +159,100 @@ private fun SkillCard(
     val borderColor = if (isActive && expanded) color else color.copy(alpha = 0.6f)
     val borderWidth = if (isActive && expanded) 1.5.dp else 1.dp
 
-    Card(
-        shape     = RoundedCornerShape(8.dp),
-        border    = androidx.compose.foundation.BorderStroke(borderWidth, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        modifier  = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
+    AnimatedVisibility(
+        visible = visible,
+        enter   = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 4 }
     ) {
-        Box(
-            modifier = Modifier
+        Card(
+            shape     = RoundedCornerShape(8.dp),
+            border    = androidx.compose.foundation.BorderStroke(borderWidth, borderColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+            modifier  = Modifier
                 .fillMaxWidth()
-                .background(Brush.linearGradient(listOf(AncientBrownLight, AncientBrown)))
-                .padding(16.dp)
+                .clickable { expanded = !expanded }
         ) {
-            Column {
-                // ── Header row ──────────────────────────────────────────────
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(52.dp)
-                            .background(color.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                    ) {
-                        Text(emoji, fontSize = 26.sp)
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.linearGradient(listOf(AncientBrownLight, AncientBrown)))
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(52.dp)
+                                .background(color.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                                .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                         ) {
-                            Text(stat.category.label,
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                color = Parchment)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                                        .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    Text("LVL ${stat.level}", style = MaterialTheme.typography.labelLarge,
-                                        color = color, fontWeight = FontWeight.ExtraBold)
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "›",
-                                    fontSize = 20.sp,
-                                    color = color.copy(alpha = 0.7f),
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.rotate(chevronRotation)
-                                )
-                            }
+                            Text(emoji, fontSize = 26.sp)
                         }
-                        Spacer(Modifier.height(3.dp))
-                        Text(skillSubtitle(stat.category),
-                            style = MaterialTheme.typography.bodyMedium, color = ParchmentDim)
-                        Spacer(Modifier.height(2.dp))
-                        Text("${heroClass.icon} ${heroClass.label.uppercase()}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                            color = color)
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(stat.category.label,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = Parchment)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(color.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                            .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text("LVL ${stat.level}", style = MaterialTheme.typography.labelLarge,
+                                            color = color, fontWeight = FontWeight.ExtraBold)
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "›",
+                                        fontSize = 20.sp,
+                                        color = color.copy(alpha = 0.7f),
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.rotate(chevronRotation)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Text(skillSubtitle(stat.category),
+                                style = MaterialTheme.typography.bodyMedium, color = ParchmentDim)
+                            Spacer(Modifier.height(2.dp))
+                            Text("${heroClass.icon} ${heroClass.label.uppercase()}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                color = color)
+                        }
                     }
-                }
 
-                Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(14.dp))
 
-                // ── XP bar ───────────────────────────────────────────────────
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text("${stat.completedTasks} tasks completed",
-                        style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
-                    Text("${stat.currentXp} / ${stat.xpToNextLevel} XP",
-                        style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
-                }
-                LinearProgressIndicator(
-                    progress   = { animatedProgress },
-                    modifier   = Modifier.fillMaxWidth().height(10.dp),
-                    color      = color,
-                    trackColor = color.copy(alpha = 0.15f),
-                    strokeCap  = StrokeCap.Round
-                )
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("${stat.completedTasks} tasks completed",
+                            style = MaterialTheme.typography.labelSmall, color = ParchmentDim)
+                        Text("${stat.currentXp} / ${stat.xpToNextLevel} XP",
+                            style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
+                    }
+                    LinearProgressIndicator(
+                        progress   = { animatedProgress },
+                        modifier   = Modifier.fillMaxWidth().height(10.dp),
+                        color      = color,
+                        trackColor = color.copy(alpha = 0.15f),
+                        strokeCap  = StrokeCap.Round
+                    )
 
-                // ── Expandable class panel ───────────────────────────────────
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter   = expandVertically(tween(280)),
-                    exit    = shrinkVertically(tween(220))
-                ) {
-                    ClassPanel(heroClass = heroClass, color = color, isActive = isActive, canActivate = canActivate, onActivate = onActivate)
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter   = expandVertically(tween(280)),
+                        exit    = shrinkVertically(tween(220))
+                    ) {
+                        ClassPanel(heroClass = heroClass, color = color, isActive = isActive, canActivate = canActivate, onActivate = onActivate)
+                    }
                 }
             }
         }

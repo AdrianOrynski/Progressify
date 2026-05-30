@@ -34,6 +34,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+val LocalSnackbarHostState = compositionLocalOf { SnackbarHostState() }
+
 // ── Złoty divider z opcjonalnym labelem ─────────────────────────
 @Composable
 fun GoldDivider(modifier: Modifier = Modifier, label: String? = null) {
@@ -314,6 +316,39 @@ fun StreakCalendar(streakDates: Set<String>, modifier: Modifier = Modifier) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── Pusty stan ekranu ────────────────────────────────────────────
+@Composable
+fun EmptyStateCard(
+    emoji    : String,
+    title    : String,
+    subtitle : String,
+    modifier : Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        FantasyCard(
+            borderColor = FantasyGoldDim.copy(alpha = 0.5f),
+            gradient    = listOf(AncientBrown.copy(alpha = 0.7f), DarkWood)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier            = Modifier.padding(16.dp).fillMaxWidth()
+            ) {
+                Text(emoji, fontSize = 48.sp, modifier = Modifier.padding(bottom = 12.dp))
+                Text(title,
+                    style     = MaterialTheme.typography.titleLarge,
+                    color     = FantasyGold,
+                    fontWeight = FontWeight.Bold,
+                    textAlign  = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(subtitle,
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = ParchmentDim,
+                    textAlign  = TextAlign.Center)
             }
         }
     }

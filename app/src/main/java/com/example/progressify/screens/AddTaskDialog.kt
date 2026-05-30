@@ -54,8 +54,10 @@ fun AddTaskDialog(
     var endHour     by remember { mutableStateOf<Int?>(null) }
     var endMinute   by remember { mutableStateOf<Int?>(null) }
 
-    var titleError by remember { mutableStateOf(false) }
-    var timeError  by remember { mutableStateOf(false) }
+    var titleError          by remember { mutableStateOf(false) }
+    var categoryError       by remember { mutableStateOf(false) }
+    var timeError           by remember { mutableStateOf(false) }
+    var timeOrderError      by remember { mutableStateOf(false) }
 
     var recurrenceType   by remember { mutableStateOf(RecurrenceType.NONE.name) }
     var selectedDays     by remember { mutableStateOf(setOf<Int>()) }
@@ -125,7 +127,9 @@ fun AddTaskDialog(
                 FantasyTextField(value = desc, onValueChange = { desc = it }, label = "Description")
                 Spacer(Modifier.height(16.dp))
 
-                Text("CATEGORY", style = MaterialTheme.typography.labelMedium, color = ParchmentDim)
+                Text("CATEGORY *",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (categoryError) DragonRedLight else ParchmentDim)
                 Spacer(Modifier.height(8.dp))
 
                 val cats      = TaskCategory.entries
@@ -142,7 +146,7 @@ fun AddTaskDialog(
                                     isSelected = selectedCat == cat.label,
                                     onClick    = {
                                 selectedCat = if (selectedCat == cat.label) "" else cat.label
-                                skillEnabled = false; selectedBonusCat = ""
+                                skillEnabled = false; selectedBonusCat = ""; categoryError = false
                             },
                                     modifier   = Modifier.weight(1f)
                                 )
@@ -151,6 +155,9 @@ fun AddTaskDialog(
                         }
                     }
                 }
+
+                if (categoryError) Text("Category is required",
+                    color = DragonRedLight, style = MaterialTheme.typography.labelSmall)
 
                 Spacer(Modifier.height(16.dp))
 
@@ -281,6 +288,8 @@ fun AddTaskDialog(
 
                 if (timeError) Text("Set start and end date & time",
                     color = DragonRedLight, style = MaterialTheme.typography.labelSmall)
+                else if (timeOrderError) Text("End time must be after start time",
+                    color = DragonRedLight, style = MaterialTheme.typography.labelSmall)
 
                 Spacer(Modifier.height(16.dp))
 
@@ -367,9 +376,12 @@ fun AddTaskDialog(
                         onClick = {
                             val startTs = buildTimestamp(startDate, startHour, startMinute)
                             val endTs   = buildTimestamp(endDate, endHour, endMinute)
-                            titleError  = title.isBlank()
-                            timeError   = startTs == null || endTs == null
-                            if (!titleError && !timeError) {
+                            titleError     = title.isBlank()
+                            categoryError  = selectedCat.isBlank()
+                            timeError      = startTs == null || endTs == null
+                            timeOrderError = startTs != null && endTs != null &&
+                                !endTs.toDate().after(startTs.toDate())
+                            if (!titleError && !categoryError && !timeError && !timeOrderError) {
                                 val effectiveDiff = if (skillEnabled && skillRequiredDiff != null) skillRequiredDiff else selectedDiff
                                 onConfirm(
                                     title, desc, selectedCat, effectiveDiff,
@@ -396,25 +408,25 @@ fun AddTaskDialog(
     if (showStartDatePicker) {
         FantasyDatePickerDialog(
             onDismiss = { showStartDatePicker = false },
-            onConfirm = { y, m, d -> startDate = Triple(y, m, d); timeError = false; showStartDatePicker = false }
+            onConfirm = { y, m, d -> startDate = Triple(y, m, d); timeError = false; timeOrderError = false; showStartDatePicker = false }
         )
     }
     if (showStartTimePicker) {
         FantasyTimePickerDialog(
             onDismiss = { showStartTimePicker = false },
-            onConfirm = { h, min -> startHour = h; startMinute = min; timeError = false; showStartTimePicker = false }
+            onConfirm = { h, min -> startHour = h; startMinute = min; timeError = false; timeOrderError = false; showStartTimePicker = false }
         )
     }
     if (showEndDatePicker) {
         FantasyDatePickerDialog(
             onDismiss = { showEndDatePicker = false },
-            onConfirm = { y, m, d -> endDate = Triple(y, m, d); timeError = false; showEndDatePicker = false }
+            onConfirm = { y, m, d -> endDate = Triple(y, m, d); timeError = false; timeOrderError = false; showEndDatePicker = false }
         )
     }
     if (showEndTimePicker) {
         FantasyTimePickerDialog(
             onDismiss = { showEndTimePicker = false },
-            onConfirm = { h, min -> endHour = h; endMinute = min; timeError = false; showEndTimePicker = false }
+            onConfirm = { h, min -> endHour = h; endMinute = min; timeError = false; timeOrderError = false; showEndTimePicker = false }
         )
     }
 }

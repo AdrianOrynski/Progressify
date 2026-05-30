@@ -30,11 +30,34 @@ fun ProfileScreen(
     onLogout: () -> Unit = {},
     onNavigateToStats: () -> Unit = {}
 ) {
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+
     val infiniteTransition = rememberInfiniteTransition(label = "avatarPulse")
     val avatarScale by infiniteTransition.animateFloat(
         initialValue  = 1f, targetValue = 1.05f,
         animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "scale")
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest  = { showLogoutConfirm = false },
+            containerColor    = AncientBrown,
+            titleContentColor = FantasyGold,
+            textContentColor  = ParchmentDim,
+            title = { Text("Leave the Tavern?", fontWeight = FontWeight.ExtraBold) },
+            text  = { Text("Your progress is saved. You'll need to log in again.") },
+            confirmButton = {
+                TextButton(onClick = { showLogoutConfirm = false; onLogout() }) {
+                    Text("LEAVE", color = DragonRedLight, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) {
+                    Text("STAY", color = FantasyGold)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -170,7 +193,7 @@ fun ProfileScreen(
         Spacer(Modifier.height(12.dp))
 
         OutlinedButton(
-            onClick = onLogout,
+            onClick = { showLogoutConfirm = true },
             modifier = Modifier.fillMaxWidth(),
             border = androidx.compose.foundation.BorderStroke(1.dp, DragonRedLight.copy(alpha = 0.6f)),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DragonRedLight)

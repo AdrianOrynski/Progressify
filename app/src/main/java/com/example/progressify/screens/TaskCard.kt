@@ -1,7 +1,7 @@
 package com.example.progressify.screens
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.progressify.*
 import com.example.progressify.ui.theme.*
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,6 +33,7 @@ fun TaskCard(
     modifier  : Modifier = Modifier
 ) {
     val isOverdue = task.isOverdue
+
     val bgColor by animateColorAsState(
         targetValue = when {
             task.isCompleted -> Color(0xFF1A1410)
@@ -44,15 +47,77 @@ fun TaskCard(
             else             -> FantasyGold
         }, animationSpec = tween(300), label = "border")
 
-    Card(modifier  = modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp),
-        border     = BorderStroke(1.dp, borderColor),
-        colors     = CardDefaults.cardColors(containerColor = bgColor),
-        elevation  = CardDefaults.cardElevation(if (task.isCompleted) 1.dp else 4.dp)) {
+    // ── Bounce przy ukończeniu ───────────────────────────────────
+    var completionAnim by remember { mutableStateOf(false) }
+    LaunchedEffect(completionAnim) {
+        if (completionAnim) {
+            kotlinx.coroutines.delay(160)
+            completionAnim = false
+        }
+    }
+    val cardScale by animateFloatAsState(
+        targetValue   = if (completionAnim) 1.04f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label         = "completionBounce"
+    )
+
+    // ── Pulsowanie overdue ───────────────────────────────────────
+    val overdueTransition = rememberInfiniteTransition(label = "overdue")
+    val overdueAlpha by overdueTransition.animateFloat(
+        initialValue  = 0.6f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label         = "overdueAlpha"
+    )
+
+    // ── Dialog potwierdzenia usunięcia ───────────────────────────
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val snackbarState = LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor   = AncientBrown,
+            titleContentColor = FantasyGold,
+            textContentColor  = ParchmentDim,
+            title = {
+                Text("Abandon Bounty?", fontWeight = FontWeight.ExtraBold)
+            },
+            text = {
+                Text("\"${task.title}\" will be lost forever.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete()
+                    scope.launch { snackbarState.showSnackbar("Bounty abandoned.") }
+                }) {
+                    Text("ABANDON", color = DragonRedLight, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("KEEP IT", color = ParchmentDim)
+                }
+            }
+        )
+    }
+
+    Card(
+        modifier  = modifier.fillMaxWidth().scale(cardScale),
+        shape     = RoundedCornerShape(8.dp),
+        border    = BorderStroke(1.dp, borderColor),
+        colors    = CardDefaults.cardColors(containerColor = bgColor),
+        elevation = CardDefaults.cardElevation(if (task.isCompleted) 1.dp else 4.dp)
+    ) {
         Row(modifier = Modifier.padding(12.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
 
-            IconButton(onClick = onComplete, enabled = !task.isCompleted,
-                modifier = Modifier.size(36.dp)) {
+            IconButton(
+                onClick  = { completionAnim = true; onComplete() },
+                enabled  = !task.isCompleted,
+                modifier = Modifier.size(36.dp)
+            ) {
                 AnimatedContent(targetState = task.isCompleted,
                     transitionSpec = { scaleIn() + fadeIn() togetherWith scaleOut() + fadeOut() },
                     label = "check") { completed ->
@@ -79,11 +144,14 @@ fun TaskCard(
 
                 if (task.startTime != null && task.endTime != null) {
                     val fmt           = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
-                    val deadlineColor = when {
+                    val baseColor = when {
                         task.isCompleted -> Color.Gray
                         isOverdue        -> DragonRedLight
                         else             -> ParchmentDim
                     }
+                    val deadlineColor = if (isOverdue && !task.isCompleted)
+                        baseColor.copy(alpha = overdueAlpha) else baseColor
+
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Icon(Icons.Default.Schedule, null, tint = deadlineColor, modifier = Modifier.size(12.dp))
@@ -112,7 +180,7 @@ fun TaskCard(
             }
 
             if (showDelete) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Delete, null,
                         tint     = DeepDragonRed.copy(alpha = if (task.isCompleted) 0.4f else 1f),
                         modifier = Modifier.size(20.dp))

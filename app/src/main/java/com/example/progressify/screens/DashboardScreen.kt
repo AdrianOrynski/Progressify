@@ -109,15 +109,16 @@ fun DashboardScreen(user: User?, taskViewModel: TaskViewModel) {
         GoldDivider(label = "ACTIVE BOUNTIES")
         Spacer(Modifier.height(12.dp))
 
-        if (activeTasks.isEmpty()) {
-            FantasyCard(borderColor = FantasyGoldDim.copy(alpha = 0.5f),
-                gradient = listOf(AncientBrown.copy(alpha = 0.6f), DarkWood)) {
-                Text("No active bounties.\nVisit the Bounty Board to add tasks!",
-                    style = MaterialTheme.typography.bodyMedium, color = ParchmentDim,
-                    modifier = Modifier.padding(8.dp))
+        when {
+            taskViewModel.isLoading -> Box(Modifier.fillMaxWidth().height(120.dp), Alignment.Center) {
+                FantasyLoadingIndicator()
             }
-        } else {
-            LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+            activeTasks.isEmpty() -> EmptyStateCard(
+                emoji    = "📋",
+                title    = "NO ACTIVE BOUNTIES",
+                subtitle = "Visit the Bounty Board to add tasks!"
+            )
+            else -> LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                 items(activeTasks, key = { it.id }) { task ->
                     TaskCard(task = task, onComplete = { taskViewModel.completeTask(task) },
                         onDelete = { taskViewModel.deleteTask(task) }, showDelete = false)

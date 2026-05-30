@@ -1,6 +1,7 @@
 package com.example.progressify.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -94,33 +95,45 @@ fun TaskListScreen(user: User?, taskViewModel: TaskViewModel) {
                         FantasyLoadingIndicator()
                     }
                     taskViewModel.tasks.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
-                        FantasyCard(borderColor = FantasyGoldDim.copy(alpha = 0.5f),
-                            gradient = listOf(AncientBrown.copy(alpha = 0.7f), DarkWood)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(16.dp)) {
-                                Text("⚔️", fontSize = 48.sp, modifier = Modifier.padding(bottom = 12.dp))
-                                Text("BOUNTY BOARD EMPTY", style = MaterialTheme.typography.titleLarge,
-                                    color = FantasyGold, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.height(8.dp))
-                                Text("Press + to post your first bounty!",
-                                    style = MaterialTheme.typography.bodyMedium, color = ParchmentDim)
-                            }
-                        }
+                        EmptyStateCard(
+                            emoji    = "⚔️",
+                            title    = "BOUNTY BOARD EMPTY",
+                            subtitle = "Press + to post your first bounty!"
+                        )
                     }
-                    else -> {
-                        val filtered = if (selectedCategory == "All") taskViewModel.tasks
-                        else taskViewModel.tasks.filter { it.category == selectedCategory }
+                    else -> AnimatedContent(
+                        targetState  = selectedCategory,
+                        transitionSpec = {
+                            fadeIn(tween(200)) togetherWith fadeOut(tween(200))
+                        },
+                        label = "filterTransition"
+                    ) { category ->
+                        val filtered = if (category == "All") taskViewModel.tasks
+                            else taskViewModel.tasks.filter { it.category == category }
                         val sorted = filtered.sortedWith(
                             compareByDescending<Task> { it.isOverdue }
                                 .thenBy { it.isCompleted }
                                 .thenBy { it.startTime?.toDate() }
                         )
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(sorted, key = { it.id }) { task ->
-                                TaskCard(task = task,
-                                    onComplete = { taskViewModel.completeTask(task) },
-                                    onDelete   = { taskViewModel.deleteTask(task) },
-                                    showDelete = true)
+                        if (sorted.isEmpty()) {
+                            Box(Modifier.fillMaxWidth().padding(top = 32.dp), Alignment.Center) {
+                                EmptyStateCard(
+                                    emoji    = "🔍",
+                                    title    = "NO BOUNTIES HERE",
+                                    subtitle = "No tasks in this category yet."
+                                )
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(sorted, key = { it.id }) { task ->
+                                    TaskCard(
+                                        task      = task,
+                                        onComplete = { taskViewModel.completeTask(task) },
+                                        onDelete   = { taskViewModel.deleteTask(task) },
+                                        showDelete = true,
+                                        modifier   = Modifier.animateItem()
+                                    )
+                                }
                             }
                         }
                     }

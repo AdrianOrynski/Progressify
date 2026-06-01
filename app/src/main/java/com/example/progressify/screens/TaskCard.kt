@@ -47,7 +47,7 @@ fun TaskCard(
             else             -> FantasyGold
         }, animationSpec = tween(300), label = "border")
 
-    // ── Bounce przy ukończeniu ───────────────────────────────────
+    // ── Completion bounce ────────────────────────────────────────
     var completionAnim by remember { mutableStateOf(false) }
     LaunchedEffect(completionAnim) {
         if (completionAnim) {
@@ -69,7 +69,7 @@ fun TaskCard(
         label         = "overdueAlpha"
     )
 
-    // ── Dialog potwierdzenia usunięcia ───────────────────────────
+    // ── Delete confirmation dialog ───────────────────────────────
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val snackbarState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
@@ -121,7 +121,8 @@ fun TaskCard(
                 AnimatedContent(targetState = task.isCompleted,
                     transitionSpec = { scaleIn() + fadeIn() togetherWith scaleOut() + fadeOut() },
                     label = "check") { completed ->
-                    Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, null,
+                    Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = if (completed) "Completed" else "Complete task",
                         tint     = if (completed) Color.Gray else if (isOverdue) DragonRedLight else FantasyGold,
                         modifier = Modifier.size(24.dp))
                 }
@@ -181,7 +182,7 @@ fun TaskCard(
 
             if (showDelete) {
                 IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Delete, null,
+                    Icon(Icons.Default.Delete, contentDescription = "Delete",
                         tint     = DeepDragonRed.copy(alpha = if (task.isCompleted) 0.4f else 1f),
                         modifier = Modifier.size(20.dp))
                 }

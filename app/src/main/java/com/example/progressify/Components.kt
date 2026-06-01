@@ -36,7 +36,7 @@ import java.util.Locale
 
 val LocalSnackbarHostState = compositionLocalOf { SnackbarHostState() }
 
-// ── Złoty divider z opcjonalnym labelem ─────────────────────────
+// ── Gold divider with optional label ────────────────────────────
 @Composable
 fun GoldDivider(modifier: Modifier = Modifier, label: String? = null) {
     if (label != null) {
@@ -50,7 +50,7 @@ fun GoldDivider(modifier: Modifier = Modifier, label: String? = null) {
     }
 }
 
-// ── Karta z gradientem i złotym obramowaniem ─────────────────────
+// ── Card with gradient and gold border ───────────────────────────
 @Composable
 fun FantasyCard(
     modifier: Modifier = Modifier,
@@ -101,7 +101,7 @@ fun XpProgressBar(currentXp: Int, maxXp: Int, modifier: Modifier = Modifier) {
     }
 }
 
-// ── Główny przycisk ──────────────────────────────────────────────
+// ── Primary button ───────────────────────────────────────────────
 @Composable
 fun FantasyButton(
     text: String,
@@ -168,7 +168,7 @@ fun FantasyTextField(
     )
 }
 
-// ── Pomocnik: pole tekstowe z togglem hasła ──────────────────────
+// ── Helper: text field with password toggle ───────────────────────
 @Composable
 fun PasswordField(
     value: String,
@@ -238,7 +238,7 @@ fun StreakFlameIndicator(streak: Int, modifier: Modifier = Modifier) {
     }
 }
 
-// ── Kalendarz streak'ów ──────────────────────────────────────────
+// ── Streak calendar ──────────────────────────────────────────────
 @Composable
 fun StreakCalendar(streakDates: Set<String>, modifier: Modifier = Modifier) {
     var displayedMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -251,7 +251,7 @@ fun StreakCalendar(streakDates: Set<String>, modifier: Modifier = Modifier) {
     val rows        = (startOffset + daysInMonth + 6) / 7
 
     Column(modifier = modifier) {
-        // Nawigacja między miesiącami
+        // Month navigation
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -272,7 +272,7 @@ fun StreakCalendar(streakDates: Set<String>, modifier: Modifier = Modifier) {
             }
         }
 
-        // Nagłówki dni tygodnia
+        // Day-of-week headers
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
             listOf("M", "T", "W", "T", "F", "S", "S").forEach { d ->
                 Text(d, modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
@@ -354,7 +354,7 @@ fun EmptyStateCard(
     }
 }
 
-// ── Pulsujący wskaźnik ładowania ─────────────────────────────────
+// ── Pulsing loading indicator ────────────────────────────────────
 @Composable
 fun FantasyLoadingIndicator(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "loading")

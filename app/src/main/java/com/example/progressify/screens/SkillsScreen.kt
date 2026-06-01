@@ -138,7 +138,7 @@ private fun SkillCard(
 
     var expanded by remember { mutableStateOf(false) }
 
-    // ── Staggered wejście karty ──────────────────────────────────
+    // ── Staggered card entrance ──────────────────────────────────
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(index * 80L)

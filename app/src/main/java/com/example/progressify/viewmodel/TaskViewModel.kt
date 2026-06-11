@@ -110,6 +110,17 @@ class TaskViewModel(app: Application) : AndroidViewModel(app) {
             maxXpGained         = it.maxXpGained
             longestQuestMinutes = it.longestQuestMinutes
             skillPoints         = it.skillPoints
+            checkAndResetStreakIfBroken()
+        }
+    }
+
+    private fun checkAndResetStreakIfBroken() {
+        if (uid.isBlank() || currentStreak == 0) return
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val today     = LocalDate.now().toString()
+        if (!streakDates.contains(yesterday) && !streakDates.contains(today)) {
+            currentStreak = 0
+            db.collection("users").document(uid).update("currentStreak", 0)
         }
     }
 

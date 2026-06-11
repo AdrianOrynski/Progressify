@@ -336,35 +336,6 @@ fun AddTaskDialog(
                     }
                 }
 
-                if (recurrenceType != RecurrenceType.NONE.name
-                    && recurrenceType != RecurrenceType.DAILY.name
-                    && recurrenceType != RecurrenceType.SELECTED_DAYS.name
-                ) {
-                    Spacer(Modifier.height(10.dp))
-                    val intervalLabel = when (recurrenceType) {
-                        RecurrenceType.WEEKLY.name  -> "Every X weeks"
-                        RecurrenceType.MONTHLY.name -> "Every X months"
-                        RecurrenceType.YEARLY.name  -> "Every X years"
-                        else                        -> "Interval"
-                    }
-                    Row(verticalAlignment    = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(intervalLabel, style = MaterialTheme.typography.labelMedium, color = ParchmentDim)
-                        Row(verticalAlignment    = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            IconButton(onClick = { if (interval > 1) interval-- },
-                                modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Remove, null, tint = FantasyGold, modifier = Modifier.size(16.dp))
-                            }
-                            Text("$interval", style = MaterialTheme.typography.titleLarge,
-                                color = FantasyGold, fontWeight = FontWeight.Bold)
-                            IconButton(onClick = { interval++ }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Add, null, tint = FantasyGold, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    }
-                }
-
                 Spacer(Modifier.height(24.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

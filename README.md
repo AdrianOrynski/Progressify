@@ -1,263 +1,104 @@
-# Progressify – Development Roadmap
+# Progressify
 
-Progressify is a mobile **LifeRPG productivity application** built in **Android Studio using Kotlin**.  
-The goal of the project is to gamify everyday tasks by rewarding users with **experience points, levels, streaks and skill progression**.
-
-This document describes the planned development roadmap and work distribution.
+A mobile productivity application that gamifies everyday task management using RPG mechanics. Complete tasks, earn XP, level up your hero, and build daily streaks — turn your goals into an adventure.
 
 ---
 
-# Project Roles
+## 📸 Screenshots
 
-### Frontend
-Responsible for:
-- UI / UX
-- Navigation
-- Screens and layouts
-- User interaction
-- Connecting UI with ViewModels
+| Dashboard (Tavern) | Task List | Add Task |
+|:---------:|:-----:|:------:|
+| ![Dashboard](screenshots/dashboard.png) | ![Tasks](screenshots/tasks.png) | ![Add Task](screenshots/add_task.png) |
+| *Main screen — first impression* | *Core feature — where users spend most time* | *Recurrence, categories and difficulty options* |
 
-Technologies:
-- Kotlin
-- Jetpack Compose
-- Android Navigation
-- MVVM architecture
+| Hero Class | Skills | Statistics |
+|:---------:|:-----:|:----------:|
+| ![Hero Class](screenshots/hero_class.png) | ![Skills](screenshots/skills.png) | ![Statistics](screenshots/statistics.png) |
+| *RPG class selection with unique XP multipliers* | *Skill progression and categorization* | *Long-term usage value* |
 
 ---
 
-### Backend
-Responsible for:
-- Application logic
-- Data models
-- XP and leveling system
-- Firebase integration
-- Data synchronization
+## Features
 
-Technologies:
-- Kotlin
-- Firebase Firestore
-- Firebase Authentication
-- Repository pattern
-
----
-
-# Authors
-
-**Progressify** was created by third-year students of  
-**Applied Computer Science and Measurement Systems**  
-at the **Faculty of Physics and Astronomy, University of Wrocław**.
-
-The application was developed as part of the course **Mobile Application Project**.
-
-## Development Team
-
-| Role | Avatar | Name | GitHub |
-|------|-------|------|--------|
-| Frontend Developer | <img src="https://github.com/Manorekk.png" width="40"/> | **Bartosz Lubański** | [GitHub](https://github.com/Manorekk) |
-| Backend Developer | <img src="https://github.com/AdrianOrynski.png" width="40"/> | **Adrian Oryński** | [GitHub](https://github.com/AdrianOrynski) |
+- **Task Management** — Create, edit, complete, and delete tasks with categories and recurrence options (daily, weekly, monthly, yearly, or custom days)
+- **XP & Leveling System** — Earn experience points based on task difficulty and completion timing; level up your hero
+- **Hero Classes** — Choose from 6 RPG-style classes, each with unique XP multipliers:
+  - Archmage (Spellcraft bonus)
+  - Mercenary (Taskforge bonus)
+  - Bard (Bard's Delight bonus)
+  - Lorekeeper (Scholar's Sanctum bonus)
+  - Paladin (Cycle of Order bonus)
+  - Barbarian (Bodyforge bonus)
+- **Skill Categories** — Track progress across 6 skill categories aligned with hero classes
+- **Streak Tracking** — Maintain daily completion streaks for bonus XP
+- **Statistics** — View XP per week, task completion rates, and skill growth charts
+- **Notifications** — Task reminders via scheduled alarms
 
 ---
 
-# Technology Stack
+## Tech Stack
 
-| Component | Technology |
-|---|---|
+| Layer | Technology |
+|-------|------------|
 | Language | Kotlin |
-| IDE | Android Studio |
-| Architecture | MVVM |
+| UI | Jetpack Compose + Material 3 |
+| Navigation | Navigation Compose |
+| Architecture | MVVM + Repository pattern |
 | Database | Firebase Firestore |
-| Authentication | Firebase Auth |
-| UI | Jetpack Compose |
+| Auth | Firebase Authentication |
+| Build | Gradle (Kotlin DSL) |
 
 ---
 
-# Development Roadmap
+## Architecture
 
-## Week 1 — Project Setup
+```
+com.example.progressify/
+├── screens/            # Compose screens (Dashboard, Tasks, Skills, Profile, Stats, Auth)
+├── viewmodel/          # AuthViewModel, TaskViewModel
+├── UserRepository.kt   # Firestore data access layer
+├── Task.kt             # Task model + XP calculation & recurrence logic
+├── User.kt             # User data model
+├── Components.kt       # Reusable UI components
+└── NotificationScheduler.kt
+```
 
-### Backend
-- Create Firebase project
-- Configure Firestore
-- Configure Firebase Authentication
-- Design database structure
-- Create basic data models
+### Firestore Structure
 
-### Frontend
-- Create Android project
-- Configure Jetpack Compose
-- Setup navigation
-- Create basic screen layouts
-
-Screens:
-- Login
-- Dashboard
-- Task List
-- Profile
-
----
-
-## Week 2 — User Authentication
-
-### Backend
-- Implement authentication logic
-- Support:
-  - Email login
-- Store user profiles in Firestore
-
-### Frontend
-- Login screen
-- Registration screen
-- Navigation after login
+```
+users/{uid}
+  └── categories/{categoryName}
+      ├── active/{taskId}
+      ├── completed/{taskId}
+      └── deleted/{taskId}
+```
 
 ---
 
-## Week 3 — Task System
+## Requirements
 
-### Backend
-- Implement task model
-- CRUD operations for tasks
-  - Create
-  - Read
-  - Update
-  - Delete
-- Store tasks in Firestore
-
-### Frontend
-- Task list screen
-- Add task screen
-- Task editing
-- Task completion toggle
+- Android SDK 28+
+- Target SDK 36
+- Android Studio (latest stable)
+- Firebase project with Firestore & Authentication enabled
 
 ---
 
-## Week 4 — XP System
+## Getting Started
 
-### Backend
-- Implement XP calculation
-- Implement level progression
-- Update XP when tasks are completed
-
-
-### Frontend
-- XP progress bar
-- User level display
-- XP gain animation
+1. Clone the repository
+2. Open in Android Studio
+3. Add your `google-services.json` to the `app/` directory
+4. Enable Email/Password authentication in the Firebase console
+5. Build and run on a device or emulator (API 28+)
 
 ---
 
-## Week 5 — Skills / Categories
+## Team
 
-### Backend
-- Implement skill categories
-- Assign tasks to skills
-- Skill level system
+| Role | Name | GitHub |
+|------|------|--------|
+| Frontend | Bartosz Lubański | [@BartoszLubanski](https://github.com/BartoszLubanski) |
+| Backend | Adrian Oryński | [@AdrianOrynski](https://github.com/AdrianOrynski) |
 
-Example skills:
-
-- Fitness
-- Knowledge
-- Productivity
-- Creativity
-
-### Frontend
-- Skills screen
-- Skill level display
-- Skill progress bars
-
----
-
-## Week 6 — Streak System
-
-### Backend
-- Implement daily streak tracking
-- Update streak after task completion
-- Streak bonus system
-
-### Frontend
-- Streak counter
-- Dashboard streak display
-- Visual streak indicators
-
----
-
-## Week 7 — Character Classes
-
-### Backend
-- Implement class system
-- XP bonuses based on category
-
-Example classes:
-
-- Warrior (Fitness bonus)
-- Scholar (Knowledge bonus)
-- Artisan (Creativity bonus)
-- Balanced (small global bonus)
-
-### Frontend
-- Class selection screen
-- Class description UI
-
----
-
-## Week 8 — Statistics
-
-### Backend
-- Aggregate user data
-- Calculate statistics
-
-Examples:
-- XP per week
-- Tasks completed
-- Skill growth
-
-### Frontend
-- Statistics screen
-- Graphs and charts
-
----
-
-## Week 9 — UI Polish & Improvements
-
-### Backend
-- Error handling
-- Data validation
-- Performance improvements
-
-### Frontend
-- UI improvements
-- Animations
-- Loading states
-- UX improvements
-
----
-
-## Week 10 — Testing & Finalization
-
-### Tasks
-- End-to-end testing
-- Fix bugs
-- Improve UI consistency
-- Prepare project presentation
-
-Deliverables:
-- Working mobile application
-- GitHub repository
-- Documentation
-- Demo scenario
-
----
-
-# Minimum Viable Product (MVP)
-
-If development time becomes limited, the minimum version should include:
-
-- User authentication
-- Task management
-- XP system
-- Level progression
-- Streak tracking
-
-Optional features:
-- Classes
-- Advanced statistics
-- Achievements
+Developed as a university course project — Mobile Application Project, 3rd year Applied Computer Science & Measurement Systems, University of Wrocław.

@@ -137,8 +137,20 @@ data class Task(
         val spentMillis = Duration.between(start, completed).toMillis().toFloat()
         val totalTaskMillis = Duration.between(start, end).toMillis().toFloat()
         if (totalTaskMillis <= 0f) return 1f
-        val ratio = (spentMillis / totalTaskMillis).coerceIn(0f, 1f)
+        // Ratio rises to 1.0 right at the deadline, then decays back down over a
+        // window equal to the task's own duration, floored so a very overdue
+        // task still earns some XP instead of trending toward zero.
+        val ratio = if (spentMillis <= totalTaskMillis) {
+            (spentMillis / totalTaskMillis).coerceIn(0f, 1f)
+        } else {
+            val overdueRatio = (spentMillis - totalTaskMillis) / totalTaskMillis
+            (1f - overdueRatio).coerceIn(MIN_OVERDUE_RATIO, 1f)
+        }
         return round(ratio * 10) / 10f
+    }
+
+    companion object {
+        private const val MIN_OVERDUE_RATIO = 0.1f
     }
 
     fun createNextOccurrence(): Task? {
